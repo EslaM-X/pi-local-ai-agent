@@ -16,7 +16,7 @@ An "Install-and-Run" desktop gateway that:
 *Our dashboard is designed for high-end transparency and ease of use, ensuring every Pi Node operator can monitor their local AI compute resources.*
 
 ![Dashboard Interface](https://github.com/EslaM-X/pi-local-ai-agent/blob/4e33ad2cfd50f81b5169f658b8186f5d9620c424/assets/Dashboard.png)
-![Hardware Transparency & Chat](https://github.com/EslaM-X/pi-local-ai-agent/blob/4ee563b277ca31e2a3dcf06e117f79cf1b3913b3/assets/Transparency.png)
+![Hardware Transparency & Chat](https://github.com/EslaM-X/pi-local-ai-agent/blob/f4096cd5049333f52726a7a8071d935514bdb06b/assets/Transparency.png)
 
 ## Why this matters for Pi Network
 By enabling local AI agents, we transform every Pi Node from a simple blockchain validator into a "Personal Computing Hub." This significantly increases the utility of the Pi ecosystem, moving us closer to a decentralized, AI-empowered future.
