@@ -1,0 +1,34 @@
+{
+  "name": "Archon AI Core — Decentralized Local Intelligence",
+  "short_name": "Archon AI",
+  "description": "Run private, verifiable AI on your Pi Node. Llama-3-8B compute stays on your hardware — zero egress, zero telemetry.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0719",
+  "theme_color": "#7c3aed",
+  "categories": ["productivity", "utilities", "developer", "finance"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/__l5e/assets-v1/919e5da4-8db2-4895-ada6-ea3f0cb913a0/archon-ai-core-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/__l5e/assets-v1/919e5da4-8db2-4895-ada6-ea3f0cb913a0/archon-ai-core-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/__l5e/assets-v1/919e5da4-8db2-4895-ada6-ea3f0cb913a0/archon-ai-core-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
