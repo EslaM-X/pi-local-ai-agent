@@ -72,32 +72,74 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+const LOGO_URL = "https://pi-mindscape.lovable.app/__l5e/assets-v1/919e5da4-8db2-4895-ada6-ea3f0cb913a0/archon-ai-core-logo.png";
+const SITE_TITLE = "Archon AI Core — Decentralized Local Intelligence for Pi Network";
+const SITE_DESC = "Archon AI Core runs private, verifiable Llama-3-8B intelligence on your Pi Node. Zero egress, zero telemetry, fully Pi-powered — built for the next billion.";
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Pi-Node AI Core — Decentralized On-Device AI" },
-      { name: "description", content: "Run private, local AI on your Pi Node. Llama-3-8B compute stays on your hardware — no cloud, no data leaks." },
-      { property: "og:title", content: "Pi-Node AI Core — Decentralized On-Device AI" },
-      { property: "og:description", content: "Run private, local AI on your Pi Node. Llama-3-8B compute stays on your hardware — no cloud, no data leaks." },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      { name: "theme-color", content: "#7c3aed" },
+      { name: "color-scheme", content: "dark" },
+      { name: "application-name", content: "Archon AI Core" },
+      { name: "apple-mobile-web-app-title", content: "Archon AI" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "format-detection", content: "telephone=no" },
+      { title: SITE_TITLE },
+      { name: "description", content: SITE_DESC },
+      { name: "keywords", content: "Pi Network, Pi Node, Archon AI, Llama-3, local AI, on-device AI, decentralized AI, zero egress, Web3 AI, Pi Wallet, GenAI" },
+      { name: "author", content: "Archon AI Core" },
+      { property: "og:site_name", content: "Archon AI Core" },
+      { property: "og:title", content: SITE_TITLE },
+      { property: "og:description", content: SITE_DESC },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://pi-mindscape.lovable.app/" },
+      { property: "og:image", content: LOGO_URL },
+      { property: "og:image:alt", content: "Archon AI Core — Decentralized Local Intelligence emblem" },
+      { property: "og:image:width", content: "1024" },
+      { property: "og:image:height", content: "1024" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Pi-Node AI Core — Decentralized On-Device AI" },
-      { name: "twitter:description", content: "Run private, local AI on your Pi Node. Llama-3-8B compute stays on your hardware — no cloud, no data leaks." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/4XvvFptLa9TCnAAOkFQ20UahlTR2/social-images/social-1782514976719-WhatsApp_Image_2026-06-27_at_2.02.26_AM.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/4XvvFptLa9TCnAAOkFQ20UahlTR2/social-images/social-1782514976719-WhatsApp_Image_2026-06-27_at_2.02.26_AM.webp" },
+      { name: "twitter:title", content: SITE_TITLE },
+      { name: "twitter:description", content: SITE_DESC },
+      { name: "twitter:image", content: LOGO_URL },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/png", href: LOGO_URL },
+      { rel: "shortcut icon", type: "image/png", href: LOGO_URL },
+      { rel: "apple-touch-icon", sizes: "180x180", href: LOGO_URL },
+      { rel: "mask-icon", href: LOGO_URL, color: "#7c3aed" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "canonical", href: "https://pi-mindscape.lovable.app/" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "preconnect", href: "https://sdk.minepi.com" },
+      { rel: "preconnect", href: "https://api.minepi.com" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
       },
     ],
-
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "Archon AI Core",
+          applicationCategory: "DeveloperApplication",
+          operatingSystem: "Web, Windows, macOS, Linux, Android, iOS",
+          description: SITE_DESC,
+          image: LOGO_URL,
+          url: "https://pi-mindscape.lovable.app/",
+          offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        }),
+      },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
