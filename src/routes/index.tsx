@@ -39,7 +39,7 @@ import {
 } from "recharts";
 import { ensurePiInit, authenticatePi, createPiPayment } from "@/lib/pi-sdk";
 import { validatePiToken } from "@/lib/pi-auth.functions";
-import { PI_PRODUCTS, type PiProductSku } from "@/lib/pi-payments.functions";
+import { PI_PRODUCTS, type PiProductSku, getCreditsState, type PurchaseRecord } from "@/lib/pi-payments.functions";
 import archonLogo from "@/assets/archon-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -79,12 +79,26 @@ type PiSession =
   | { status: "authenticated"; username: string; uid: string }
   | { status: "error"; message: string };
 
+type PurchaseStatus = "pending" | "approved" | "completed" | "failed" | "cancelled";
+type Purchase = {
+  id: string;
+  paymentId?: string;
+  sku: PiProductSku;
+  packName: string;
+  amount: number;
+  credits: number;
+  status: PurchaseStatus;
+  error?: string;
+  ts: number;
+};
+
 // ============ Constants ============
 const STORAGE_CHAT = "pinode.chat.v1";
 const STORAGE_WALLET = "pinode.wallet.v1";
 const STORAGE_ONBOARD = "archon.onboard.v1";
 const STORAGE_PI_SESSION = "archon.pi.session.v1";
 const STORAGE_CREDITS = "archon.credits.v1";
+const STORAGE_PURCHASES = "archon.purchases.v1";
 const MAX_PROMPT_LEN = 2000;
 const MIN_PROMPT_LEN = 2;
 
@@ -164,6 +178,8 @@ function Dashboard() {
   // ---- Pi auth ----
   const [pi, setPi] = useState<PiSession>({ status: "idle" });
   const piAttemptedRef = useRef(false);
+  const piAccessTokenRef = useRef<string | null>(null);
+  const refreshCreditsRef = useRef<() => Promise<void>>(async () => {});
 
   const runPiAuth = useCallback(async (silent = false) => {
     if (typeof window === "undefined") return;
@@ -174,8 +190,11 @@ function Dashboard() {
       const verified = await validatePiToken({ data: { accessToken: result.accessToken } });
       if (!verified.ok) throw new Error(verified.error);
       const session = { status: "authenticated" as const, username: verified.user.username, uid: verified.user.uid };
+      piAccessTokenRef.current = result.accessToken;
       setPi(session);
       try { localStorage.setItem(STORAGE_PI_SESSION, JSON.stringify(session)); } catch { /* ignore */ }
+      // Refresh authoritative credits balance from the server.
+      void refreshCreditsRef.current();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Pi authentication failed.";
       setPi({ status: "error", message });
@@ -201,6 +220,7 @@ function Dashboard() {
   }, [runPiAuth]);
 
   const signOutPi = useCallback(() => {
+    piAccessTokenRef.current = null;
     setPi({ status: "idle" });
     try { localStorage.removeItem(STORAGE_PI_SESSION); } catch { /* ignore */ }
   }, []);
@@ -449,7 +469,10 @@ function Dashboard() {
   const [credits, setCredits] = useState<number>(0);
   const [buying, setBuying] = useState<PiProductSku | null>(null);
   const [payStatus, setPayStatus] = useState<{ kind: "idle" | "ok" | "error" | "cancelled"; message?: string }>({ kind: "idle" });
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [creditsRefreshing, setCreditsRefreshing] = useState(false);
 
+  // Hydrate balance + purchases from localStorage (offline-first mirror).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_CREDITS);
@@ -458,13 +481,68 @@ function Dashboard() {
         if (Number.isFinite(n) && n >= 0) setCredits(n);
       }
     } catch { /* ignore */ }
+    try {
+      const raw = localStorage.getItem(STORAGE_PURCHASES);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setPurchases(arr as Purchase[]);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_CREDITS, JSON.stringify(credits)); } catch { /* ignore */ }
   }, [credits]);
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_PURCHASES, JSON.stringify(purchases)); } catch { /* ignore */ }
+  }, [purchases]);
 
-  const buyCredits = useCallback(async (sku: PiProductSku) => {
+  // Authoritative balance fetch from the server. Merges server-side
+  // completed purchases into the local history without duplicating.
+  const refreshCredits = useCallback(async () => {
+    const token = piAccessTokenRef.current;
+    if (!token) return;
+    setCreditsRefreshing(true);
+    try {
+      const res = await getCreditsState({ data: { accessToken: token } });
+      if (res.ok) {
+        setCredits(res.balance);
+        setPurchases((prev) => {
+          const byPaymentId = new Map<string, Purchase>();
+          for (const p of prev) if (p.paymentId) byPaymentId.set(p.paymentId, p);
+          for (const s of res.purchases as PurchaseRecord[]) {
+            const existing = byPaymentId.get(s.paymentId);
+            byPaymentId.set(s.paymentId, {
+              id: existing?.id ?? s.paymentId,
+              paymentId: s.paymentId,
+              sku: s.sku,
+              packName: s.packName,
+              amount: s.amount,
+              credits: s.credits,
+              status: "completed",
+              ts: existing?.ts ?? s.ts,
+            });
+          }
+          const merged = [
+            ...prev.filter((p) => !p.paymentId || !byPaymentId.has(p.paymentId)),
+            ...byPaymentId.values(),
+          ];
+          merged.sort((a, b) => b.ts - a.ts);
+          return merged;
+        });
+      }
+    } catch { /* ignore */ } finally {
+      setCreditsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { refreshCreditsRef.current = refreshCredits; }, [refreshCredits]);
+
+  const updatePurchase = useCallback((id: string, patch: Partial<Purchase>) => {
+    setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
+
+  const buyCredits = useCallback(async (sku: PiProductSku, retryOfId?: string) => {
     if (pi.status !== "authenticated") {
       setPayStatus({ kind: "error", message: "Sign in with Pi before purchasing credits." });
       return;
@@ -472,8 +550,28 @@ function Dashboard() {
     const product = PI_PRODUCTS[sku];
     setBuying(sku);
     setPayStatus({ kind: "idle" });
+
+    // Reuse the existing row for a retry so the user sees lifecycle in place
+    // instead of an ever-growing list of duplicates.
+    const localId = retryOfId ?? uid();
+    if (retryOfId) {
+      updatePurchase(retryOfId, { status: "pending", error: undefined, ts: Date.now(), paymentId: undefined });
+    } else {
+      setPurchases((prev) => [
+        {
+          id: localId,
+          sku,
+          packName: product.name,
+          amount: product.amount,
+          credits: product.credits,
+          status: "pending",
+          ts: Date.now(),
+        },
+        ...prev,
+      ]);
+    }
+
     try {
-      // Pi.init is awaited inside createPiPayment.
       await createPiPayment(
         {
           amount: product.amount,
@@ -481,26 +579,45 @@ function Dashboard() {
           metadata: { sku, credits: product.credits, app: "archon-ai-core" },
         },
         {
-          onCompleted: (_paymentId) => {
-            setCredits((c) => c + product.credits);
+          onApproved: (paymentId) => {
+            updatePurchase(localId, { paymentId, status: "approved" });
+          },
+          onCompleted: (paymentId) => {
+            updatePurchase(localId, { paymentId, status: "completed" });
             setPayStatus({ kind: "ok", message: `+${product.credits.toLocaleString()} Pro Compute Credits added.` });
             setBuying(null);
+            // Server is authoritative; refetch dedups across retries.
+            void refreshCredits();
           },
           onCancel: () => {
+            updatePurchase(localId, { status: "cancelled" });
             setPayStatus({ kind: "cancelled", message: "Payment cancelled." });
             setBuying(null);
           },
           onError: (err) => {
+            updatePurchase(localId, { status: "failed", error: err.message });
             setPayStatus({ kind: "error", message: err.message || "Payment failed." });
             setBuying(null);
           },
         },
       );
     } catch (err) {
-      setPayStatus({ kind: "error", message: err instanceof Error ? err.message : "Payment failed." });
+      const message = err instanceof Error ? err.message : "Payment failed.";
+      updatePurchase(localId, { status: "failed", error: message });
+      setPayStatus({ kind: "error", message });
       setBuying(null);
     }
-  }, [pi.status]);
+  }, [pi.status, refreshCredits, updatePurchase]);
+
+  const retryPurchase = useCallback((p: Purchase) => {
+    void buyCredits(p.sku, p.id);
+  }, [buyCredits]);
+
+  const clearPurchase = useCallback((id: string) => {
+    setPurchases((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+
 
 
 
@@ -652,8 +769,17 @@ function Dashboard() {
           buying={buying}
           payStatus={payStatus}
           piAuthed={pi.status === "authenticated"}
-          onBuy={buyCredits}
+          onBuy={(sku) => buyCredits(sku)}
+          onRefresh={refreshCredits}
+          refreshing={creditsRefreshing}
         />
+
+        <PurchaseHistory
+          purchases={purchases}
+          onRetry={retryPurchase}
+          onClear={clearPurchase}
+        />
+
 
         {/* Hardware Chart + Chat */}
         <section aria-label="Hardware transparency and local chat" className="grid grid-cols-1 lg:grid-cols-5 gap-5">
@@ -1264,6 +1390,124 @@ function Bubble({ m, onResend }: { m: ChatMessage; onResend: (id: string) => voi
   );
 }
 
+// ============ Purchase History ============
+function PurchaseHistory({
+  purchases,
+  onRetry,
+  onClear,
+}: {
+  purchases: Purchase[];
+  onRetry: (p: Purchase) => void;
+  onClear: (id: string) => void;
+}) {
+  const statusMeta: Record<PurchaseStatus, { label: string; cls: string; dot: string }> = {
+    pending: { label: "Pending", cls: "text-amber-400 border-amber-400/30 bg-amber-400/10", dot: "bg-amber-400 animate-pulse" },
+    approved: { label: "Approved", cls: "text-primary border-primary/30 bg-primary/10", dot: "bg-primary animate-pulse" },
+    completed: { label: "Granted", cls: "text-success border-success/30 bg-success/10", dot: "bg-success" },
+    failed: { label: "Failed", cls: "text-destructive border-destructive/30 bg-destructive/10", dot: "bg-destructive" },
+    cancelled: { label: "Cancelled", cls: "text-muted-foreground border-border bg-card/60", dot: "bg-muted-foreground" },
+  };
+
+  return (
+    <section aria-labelledby="purchases-title" className="glass-card rounded-2xl p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <Activity className="w-3.5 h-3.5 text-primary" aria-hidden="true" /> Purchase History
+          </div>
+          <h2 id="purchases-title" className="mt-3 font-display text-xl font-semibold">
+            Pro Compute payments ledger
+          </h2>
+        </div>
+        <span className="text-xs text-muted-foreground font-mono">
+          {purchases.length} {purchases.length === 1 ? "entry" : "entries"}
+        </span>
+      </div>
+
+      {purchases.length === 0 ? (
+        <div className="mt-5 rounded-xl border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">
+          No purchases yet. Your Pi payments will appear here with full lifecycle status.
+        </div>
+      ) : (
+        <div className="mt-5 overflow-x-auto" role="region" aria-label="Pi payments history">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border/60">
+                <th className="py-2 pr-3 font-medium">Payment ID</th>
+                <th className="py-2 pr-3 font-medium">Pack</th>
+                <th className="py-2 pr-3 font-medium text-right">Amount</th>
+                <th className="py-2 pr-3 font-medium">Status</th>
+                <th className="py-2 pr-3 font-medium">When</th>
+                <th className="py-2 pr-3 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchases.map((p) => {
+                const meta = statusMeta[p.status];
+                const idLabel = p.paymentId ? `${p.paymentId.slice(0, 8)}…${p.paymentId.slice(-4)}` : "—";
+                return (
+                  <tr key={p.id} className="border-b border-border/40 last:border-b-0 align-top">
+                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground" title={p.paymentId ?? ""}>
+                      {idLabel}
+                    </td>
+                    <td className="py-3 pr-3">
+                      <div className="font-medium">{p.packName}</div>
+                      <div className="text-[11px] text-muted-foreground font-mono">
+                        +{p.credits.toLocaleString()} credits
+                      </div>
+                      {p.error && (
+                        <div className="text-[11px] text-destructive mt-0.5">{p.error}</div>
+                      )}
+                    </td>
+                    <td className="py-3 pr-3 text-right font-display font-semibold tabular-nums">
+                      π {p.amount}
+                    </td>
+                    <td className="py-3 pr-3">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] ${meta.cls}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-xs text-muted-foreground font-mono whitespace-nowrap">
+                      {fmtTime(p.ts)}
+                    </td>
+                    <td className="py-3 pr-0 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        {(p.status === "failed" || p.status === "cancelled") && (
+                          <button
+                            type="button"
+                            onClick={() => onRetry(p)}
+                            aria-label={`Retry ${p.packName} purchase`}
+                            className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 bg-primary/10 text-primary text-xs hover:bg-primary/20 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            <RefreshCw className="w-3 h-3" aria-hidden="true" /> Retry
+                          </button>
+                        )}
+                        {p.status !== "pending" && p.status !== "approved" && (
+                          <button
+                            type="button"
+                            onClick={() => onClear(p.id)}
+                            aria-label={`Remove ${p.packName} from history`}
+                            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-card/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            <X className="w-3 h-3" aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ============ Credits Store ============
 function CreditsStore({
   credits,
@@ -1271,12 +1515,16 @@ function CreditsStore({
   payStatus,
   piAuthed,
   onBuy,
+  onRefresh,
+  refreshing,
 }: {
   credits: number;
   buying: PiProductSku | null;
   payStatus: { kind: "idle" | "ok" | "error" | "cancelled"; message?: string };
   piAuthed: boolean;
   onBuy: (sku: PiProductSku) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
 }) {
   const skus = Object.keys(PI_PRODUCTS) as PiProductSku[];
   return (
@@ -1294,16 +1542,28 @@ function CreditsStore({
             Credits unlock higher inference throughput and longer context on your local Llama-3-8B.
           </p>
         </div>
-        <div
-          className="flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full border border-primary/30 bg-primary/10"
-          role="status"
-          aria-live="polite"
-        >
-          <Coins className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-          <span className="text-xs text-muted-foreground">Balance</span>
-          <span className="font-display font-semibold tabular-nums">{credits.toLocaleString()}</span>
+        <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full border border-primary/30 bg-primary/10"
+            role="status"
+            aria-live="polite"
+          >
+            <Coins className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+            <span className="text-xs text-muted-foreground">Balance</span>
+            <span className="font-display font-semibold tabular-nums">{credits.toLocaleString()}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={!piAuthed || refreshing}
+            aria-label="Refresh credit balance"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/70 bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/40 transition disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+          </button>
         </div>
       </div>
+
 
       <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
         {skus.map((sku) => {
