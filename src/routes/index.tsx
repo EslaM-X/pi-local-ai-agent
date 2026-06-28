@@ -39,7 +39,7 @@ import {
 } from "recharts";
 import { ensurePiInit, authenticatePi, createPiPayment } from "@/lib/pi-sdk";
 import { validatePiToken } from "@/lib/pi-auth.functions";
-import { PI_PRODUCTS, type PiProductSku } from "@/lib/pi-payments.functions";
+import { PI_PRODUCTS, type PiProductSku, getCreditsState, type PurchaseRecord } from "@/lib/pi-payments.functions";
 import archonLogo from "@/assets/archon-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
