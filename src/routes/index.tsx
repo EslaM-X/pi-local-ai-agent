@@ -769,8 +769,17 @@ function Dashboard() {
           buying={buying}
           payStatus={payStatus}
           piAuthed={pi.status === "authenticated"}
-          onBuy={buyCredits}
+          onBuy={(sku) => buyCredits(sku)}
+          onRefresh={refreshCredits}
+          refreshing={creditsRefreshing}
         />
+
+        <PurchaseHistory
+          purchases={purchases}
+          onRetry={retryPurchase}
+          onClear={clearPurchase}
+        />
+
 
         {/* Hardware Chart + Chat */}
         <section aria-label="Hardware transparency and local chat" className="grid grid-cols-1 lg:grid-cols-5 gap-5">
