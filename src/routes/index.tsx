@@ -445,6 +445,65 @@ function Dashboard() {
     try { localStorage.setItem(STORAGE_ONBOARD, "1"); } catch { /* ignore */ }
   }, []);
 
+  // ---- Pi Payments: Pro Compute Credits ----
+  const [credits, setCredits] = useState<number>(0);
+  const [buying, setBuying] = useState<PiProductSku | null>(null);
+  const [payStatus, setPayStatus] = useState<{ kind: "idle" | "ok" | "error" | "cancelled"; message?: string }>({ kind: "idle" });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_CREDITS);
+      if (raw) {
+        const n = Number(JSON.parse(raw));
+        if (Number.isFinite(n) && n >= 0) setCredits(n);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_CREDITS, JSON.stringify(credits)); } catch { /* ignore */ }
+  }, [credits]);
+
+  const buyCredits = useCallback(async (sku: PiProductSku) => {
+    if (pi.status !== "authenticated") {
+      setPayStatus({ kind: "error", message: "Sign in with Pi before purchasing credits." });
+      return;
+    }
+    const product = PI_PRODUCTS[sku];
+    setBuying(sku);
+    setPayStatus({ kind: "idle" });
+    try {
+      // Pi.init is awaited inside createPiPayment.
+      await createPiPayment(
+        {
+          amount: product.amount,
+          memo: product.memo,
+          metadata: { sku, credits: product.credits, app: "archon-ai-core" },
+        },
+        {
+          onCompleted: (_paymentId) => {
+            setCredits((c) => c + product.credits);
+            setPayStatus({ kind: "ok", message: `+${product.credits.toLocaleString()} Pro Compute Credits added.` });
+            setBuying(null);
+          },
+          onCancel: () => {
+            setPayStatus({ kind: "cancelled", message: "Payment cancelled." });
+            setBuying(null);
+          },
+          onError: (err) => {
+            setPayStatus({ kind: "error", message: err.message || "Payment failed." });
+            setBuying(null);
+          },
+        },
+      );
+    } catch (err) {
+      setPayStatus({ kind: "error", message: err instanceof Error ? err.message : "Payment failed." });
+      setBuying(null);
+    }
+  }, [pi.status]);
+
+
+
   // ---- Render ----
   return (
     <div className="min-h-screen text-foreground">
