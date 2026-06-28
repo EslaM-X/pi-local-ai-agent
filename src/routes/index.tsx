@@ -178,6 +178,8 @@ function Dashboard() {
   // ---- Pi auth ----
   const [pi, setPi] = useState<PiSession>({ status: "idle" });
   const piAttemptedRef = useRef(false);
+  const piAccessTokenRef = useRef<string | null>(null);
+  const refreshCreditsRef = useRef<() => Promise<void>>(async () => {});
 
   const runPiAuth = useCallback(async (silent = false) => {
     if (typeof window === "undefined") return;
@@ -188,8 +190,11 @@ function Dashboard() {
       const verified = await validatePiToken({ data: { accessToken: result.accessToken } });
       if (!verified.ok) throw new Error(verified.error);
       const session = { status: "authenticated" as const, username: verified.user.username, uid: verified.user.uid };
+      piAccessTokenRef.current = result.accessToken;
       setPi(session);
       try { localStorage.setItem(STORAGE_PI_SESSION, JSON.stringify(session)); } catch { /* ignore */ }
+      // Refresh authoritative credits balance from the server.
+      void refreshCreditsRef.current();
     } catch (e) {
       const message = e instanceof Error ? e.message : "Pi authentication failed.";
       setPi({ status: "error", message });
