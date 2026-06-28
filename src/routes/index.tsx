@@ -85,6 +85,7 @@ const STORAGE_WALLET = "pinode.wallet.v1";
 const STORAGE_ONBOARD = "archon.onboard.v1";
 const STORAGE_PI_SESSION = "archon.pi.session.v1";
 const STORAGE_CREDITS = "archon.credits.v1";
+const STORAGE_PURCHASES = "archon.purchases.v1";
 const MAX_PROMPT_LEN = 2000;
 const MIN_PROMPT_LEN = 2;
 
