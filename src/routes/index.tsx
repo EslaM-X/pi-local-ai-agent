@@ -25,6 +25,8 @@ import {
   ChevronRight,
   ChevronLeft,
   KeyRound,
+  Coins,
+  ShoppingBag,
 } from "lucide-react";
 import {
   Area,
@@ -35,8 +37,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ensurePiInit, authenticatePi } from "@/lib/pi-sdk";
+import { ensurePiInit, authenticatePi, createPiPayment } from "@/lib/pi-sdk";
 import { validatePiToken } from "@/lib/pi-auth.functions";
+import { PI_PRODUCTS, type PiProductSku } from "@/lib/pi-payments.functions";
 import archonLogo from "@/assets/archon-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
