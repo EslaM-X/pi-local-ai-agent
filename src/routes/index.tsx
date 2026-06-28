@@ -220,6 +220,7 @@ function Dashboard() {
   }, [runPiAuth]);
 
   const signOutPi = useCallback(() => {
+    piAccessTokenRef.current = null;
     setPi({ status: "idle" });
     try { localStorage.removeItem(STORAGE_PI_SESSION); } catch { /* ignore */ }
   }, []);
