@@ -1397,12 +1397,16 @@ function CreditsStore({
   payStatus,
   piAuthed,
   onBuy,
+  onRefresh,
+  refreshing,
 }: {
   credits: number;
   buying: PiProductSku | null;
   payStatus: { kind: "idle" | "ok" | "error" | "cancelled"; message?: string };
   piAuthed: boolean;
   onBuy: (sku: PiProductSku) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
 }) {
   const skus = Object.keys(PI_PRODUCTS) as PiProductSku[];
   return (
@@ -1420,16 +1424,28 @@ function CreditsStore({
             Credits unlock higher inference throughput and longer context on your local Llama-3-8B.
           </p>
         </div>
-        <div
-          className="flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full border border-primary/30 bg-primary/10"
-          role="status"
-          aria-live="polite"
-        >
-          <Coins className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-          <span className="text-xs text-muted-foreground">Balance</span>
-          <span className="font-display font-semibold tabular-nums">{credits.toLocaleString()}</span>
+        <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full border border-primary/30 bg-primary/10"
+            role="status"
+            aria-live="polite"
+          >
+            <Coins className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+            <span className="text-xs text-muted-foreground">Balance</span>
+            <span className="font-display font-semibold tabular-nums">{credits.toLocaleString()}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={!piAuthed || refreshing}
+            aria-label="Refresh credit balance"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/70 bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/40 transition disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+          </button>
         </div>
       </div>
+
 
       <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
         {skus.map((sku) => {
