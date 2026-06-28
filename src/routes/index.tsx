@@ -647,6 +647,14 @@ function Dashboard() {
           </div>
         </section>
 
+        <CreditsStore
+          credits={credits}
+          buying={buying}
+          payStatus={payStatus}
+          piAuthed={pi.status === "authenticated"}
+          onBuy={buyCredits}
+        />
+
         {/* Hardware Chart + Chat */}
         <section aria-label="Hardware transparency and local chat" className="grid grid-cols-1 lg:grid-cols-5 gap-5">
           <HardwareCard
