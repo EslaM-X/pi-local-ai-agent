@@ -1390,6 +1390,124 @@ function Bubble({ m, onResend }: { m: ChatMessage; onResend: (id: string) => voi
   );
 }
 
+// ============ Purchase History ============
+function PurchaseHistory({
+  purchases,
+  onRetry,
+  onClear,
+}: {
+  purchases: Purchase[];
+  onRetry: (p: Purchase) => void;
+  onClear: (id: string) => void;
+}) {
+  const statusMeta: Record<PurchaseStatus, { label: string; cls: string; dot: string }> = {
+    pending: { label: "Pending", cls: "text-amber-400 border-amber-400/30 bg-amber-400/10", dot: "bg-amber-400 animate-pulse" },
+    approved: { label: "Approved", cls: "text-primary border-primary/30 bg-primary/10", dot: "bg-primary animate-pulse" },
+    completed: { label: "Granted", cls: "text-success border-success/30 bg-success/10", dot: "bg-success" },
+    failed: { label: "Failed", cls: "text-destructive border-destructive/30 bg-destructive/10", dot: "bg-destructive" },
+    cancelled: { label: "Cancelled", cls: "text-muted-foreground border-border bg-card/60", dot: "bg-muted-foreground" },
+  };
+
+  return (
+    <section aria-labelledby="purchases-title" className="glass-card rounded-2xl p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <Activity className="w-3.5 h-3.5 text-primary" aria-hidden="true" /> Purchase History
+          </div>
+          <h2 id="purchases-title" className="mt-3 font-display text-xl font-semibold">
+            Pro Compute payments ledger
+          </h2>
+        </div>
+        <span className="text-xs text-muted-foreground font-mono">
+          {purchases.length} {purchases.length === 1 ? "entry" : "entries"}
+        </span>
+      </div>
+
+      {purchases.length === 0 ? (
+        <div className="mt-5 rounded-xl border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">
+          No purchases yet. Your Pi payments will appear here with full lifecycle status.
+        </div>
+      ) : (
+        <div className="mt-5 overflow-x-auto" role="region" aria-label="Pi payments history">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border/60">
+                <th className="py-2 pr-3 font-medium">Payment ID</th>
+                <th className="py-2 pr-3 font-medium">Pack</th>
+                <th className="py-2 pr-3 font-medium text-right">Amount</th>
+                <th className="py-2 pr-3 font-medium">Status</th>
+                <th className="py-2 pr-3 font-medium">When</th>
+                <th className="py-2 pr-3 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchases.map((p) => {
+                const meta = statusMeta[p.status];
+                const idLabel = p.paymentId ? `${p.paymentId.slice(0, 8)}…${p.paymentId.slice(-4)}` : "—";
+                return (
+                  <tr key={p.id} className="border-b border-border/40 last:border-b-0 align-top">
+                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground" title={p.paymentId ?? ""}>
+                      {idLabel}
+                    </td>
+                    <td className="py-3 pr-3">
+                      <div className="font-medium">{p.packName}</div>
+                      <div className="text-[11px] text-muted-foreground font-mono">
+                        +{p.credits.toLocaleString()} credits
+                      </div>
+                      {p.error && (
+                        <div className="text-[11px] text-destructive mt-0.5">{p.error}</div>
+                      )}
+                    </td>
+                    <td className="py-3 pr-3 text-right font-display font-semibold tabular-nums">
+                      π {p.amount}
+                    </td>
+                    <td className="py-3 pr-3">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] ${meta.cls}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-xs text-muted-foreground font-mono whitespace-nowrap">
+                      {fmtTime(p.ts)}
+                    </td>
+                    <td className="py-3 pr-0 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        {(p.status === "failed" || p.status === "cancelled") && (
+                          <button
+                            type="button"
+                            onClick={() => onRetry(p)}
+                            aria-label={`Retry ${p.packName} purchase`}
+                            className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-primary/40 bg-primary/10 text-primary text-xs hover:bg-primary/20 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            <RefreshCw className="w-3 h-3" aria-hidden="true" /> Retry
+                          </button>
+                        )}
+                        {p.status !== "pending" && p.status !== "approved" && (
+                          <button
+                            type="button"
+                            onClick={() => onClear(p.id)}
+                            aria-label={`Remove ${p.packName} from history`}
+                            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-card/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            <X className="w-3 h-3" aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ============ Credits Store ============
 function CreditsStore({
   credits,
