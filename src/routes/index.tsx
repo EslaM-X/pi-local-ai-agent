@@ -79,6 +79,19 @@ type PiSession =
   | { status: "authenticated"; username: string; uid: string }
   | { status: "error"; message: string };
 
+type PurchaseStatus = "pending" | "approved" | "completed" | "failed" | "cancelled";
+type Purchase = {
+  id: string;
+  paymentId?: string;
+  sku: PiProductSku;
+  packName: string;
+  amount: number;
+  credits: number;
+  status: PurchaseStatus;
+  error?: string;
+  ts: number;
+};
+
 // ============ Constants ============
 const STORAGE_CHAT = "pinode.chat.v1";
 const STORAGE_WALLET = "pinode.wallet.v1";
