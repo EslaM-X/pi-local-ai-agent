@@ -1,17 +1,53 @@
 // Client-side Pi Network SDK helper.
 // Reference: https://pi-apps.github.io/pi-sdk-docs/quick-start/genai/Authentication
+//            https://pi-apps.github.io/pi-sdk-docs/quick-start/genai/Payments
+
+import { approvePiPayment, completePiPayment } from "@/lib/pi-payments.functions";
 
 export type PiAuthResult = {
   accessToken: string;
   user: { uid: string; username: string };
 };
 
+export type PiPaymentDTO = {
+  identifier: string;
+  user_uid: string;
+  amount: number;
+  memo: string;
+  metadata: Record<string, unknown>;
+  to_address: string;
+  created_at: string;
+  network: "Pi Network" | "Pi Testnet";
+  status: {
+    developer_approved: boolean;
+    transaction_verified: boolean;
+    developer_completed: boolean;
+    cancelled: boolean;
+    user_cancelled: boolean;
+  };
+  transaction: null | { txid: string; verified: boolean; _link: string };
+};
+
+export type PiPaymentData = {
+  amount: number;
+  memo: string;
+  metadata: Record<string, unknown>;
+};
+
+export type PiPaymentCallbacks = {
+  onReadyForServerApproval: (paymentId: string) => void;
+  onReadyForServerCompletion: (paymentId: string, txid: string) => void;
+  onCancel: (paymentId: string) => void;
+  onError: (error: Error, payment?: PiPaymentDTO) => void;
+};
+
 type PiSdk = {
   init: (opts: { version: string; sandbox?: boolean }) => Promise<void> | void;
   authenticate: (
     scopes: string[],
-    onIncompletePaymentFound?: (payment: unknown) => void,
+    onIncompletePaymentFound: (payment: PiPaymentDTO) => void,
   ) => Promise<PiAuthResult>;
+  createPayment: (data: PiPaymentData, callbacks: PiPaymentCallbacks) => Promise<PiPaymentDTO>;
 };
 
 declare global {
@@ -53,25 +89,94 @@ export async function ensurePiInit(opts: { sandbox?: boolean } = {}): Promise<vo
   initPromise = (async () => {
     await loadScript();
     if (!window.Pi) throw new Error("Pi SDK did not register window.Pi");
-    // Per the Pi SDK docs, init may return void or a Promise — await both safely.
     await Promise.resolve(window.Pi.init({ version: "2.0", sandbox: opts.sandbox ?? false }));
   })().catch((err) => {
-    initPromise = null; // allow retry on failure
+    initPromise = null;
     throw err;
   });
   return initPromise;
 }
 
-/** Run the full Pi auth flow with the `username` scope and return the access token + user. */
+/**
+ * Required by the Pi SDK: when a previous payment is left in-flight,
+ * complete it through the backend instead of silently ignoring.
+ */
+async function handleIncompletePayment(payment: PiPaymentDTO): Promise<void> {
+  try {
+    const txid = payment.transaction?.txid;
+    if (!txid) {
+      console.warn("[Pi] incomplete payment missing txid, skipping complete()", payment.identifier);
+      return;
+    }
+    const res = await completePiPayment({ data: { paymentId: payment.identifier, txid } });
+    if (!res.ok) {
+      console.error("[Pi] failed to complete incomplete payment", payment.identifier, res.error);
+    } else {
+      console.info("[Pi] completed in-flight payment", payment.identifier);
+    }
+  } catch (err) {
+    console.error("[Pi] error completing in-flight payment", err);
+  }
+}
+
+/** Run the full Pi auth flow with `username` + `payments` scopes and return the access token + user. */
 export async function authenticatePi(): Promise<PiAuthResult> {
   await ensurePiInit();
   if (!window.Pi) throw new Error("Pi SDK is unavailable");
-  const result = await window.Pi.authenticate(["username"], (payment) => {
-    // Required by SDK signature; we don't process incomplete payments here.
-    if (typeof console !== "undefined") console.warn("[Pi] incomplete payment found", payment);
-  });
+  const result = await window.Pi.authenticate(
+    ["username", "payments"],
+    (payment) => void handleIncompletePayment(payment),
+  );
   if (!result?.accessToken || !result.user?.username) {
     throw new Error("Pi authentication returned an invalid payload");
   }
   return result;
+}
+
+/**
+ * Create a User-to-App (U2A) Pi payment.
+ * - Awaits Pi.init before calling Pi.createPayment.
+ * - onReadyForServerApproval -> backend POST /v2/payments/:id/approve
+ * - onReadyForServerCompletion -> backend POST /v2/payments/:id/complete
+ * - onIncompletePaymentFound is always set via the shared handler.
+ */
+export async function createPiPayment(
+  data: PiPaymentData,
+  hooks: {
+    onApproved?: (paymentId: string) => void;
+    onCompleted?: (paymentId: string, txid: string) => void;
+    onCancel?: (paymentId: string) => void;
+    onError?: (error: Error) => void;
+  } = {},
+): Promise<PiPaymentDTO> {
+  await ensurePiInit();
+  if (!window.Pi) throw new Error("Pi SDK is unavailable");
+
+  return window.Pi.createPayment(data, {
+    onReadyForServerApproval: async (paymentId) => {
+      try {
+        const res = await approvePiPayment({ data: { paymentId, expected: data } });
+        if (!res.ok) throw new Error(res.error);
+        hooks.onApproved?.(paymentId);
+      } catch (err) {
+        hooks.onError?.(err instanceof Error ? err : new Error("approval failed"));
+      }
+    },
+    onReadyForServerCompletion: async (paymentId, txid) => {
+      try {
+        const res = await completePiPayment({ data: { paymentId, txid } });
+        if (!res.ok) throw new Error(res.error);
+        hooks.onCompleted?.(paymentId, txid);
+      } catch (err) {
+        hooks.onError?.(err instanceof Error ? err : new Error("completion failed"));
+      }
+    },
+    onCancel: (paymentId) => {
+      hooks.onCancel?.(paymentId);
+    },
+    onError: (error, payment) => {
+      if (payment) void handleIncompletePayment(payment);
+      hooks.onError?.(error);
+    },
+  });
 }

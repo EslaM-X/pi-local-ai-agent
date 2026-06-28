@@ -25,6 +25,8 @@ import {
   ChevronRight,
   ChevronLeft,
   KeyRound,
+  Coins,
+  ShoppingBag,
 } from "lucide-react";
 import {
   Area,
@@ -35,8 +37,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ensurePiInit, authenticatePi } from "@/lib/pi-sdk";
+import { ensurePiInit, authenticatePi, createPiPayment } from "@/lib/pi-sdk";
 import { validatePiToken } from "@/lib/pi-auth.functions";
+import { PI_PRODUCTS, type PiProductSku } from "@/lib/pi-payments.functions";
 import archonLogo from "@/assets/archon-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
@@ -81,6 +84,7 @@ const STORAGE_CHAT = "pinode.chat.v1";
 const STORAGE_WALLET = "pinode.wallet.v1";
 const STORAGE_ONBOARD = "archon.onboard.v1";
 const STORAGE_PI_SESSION = "archon.pi.session.v1";
+const STORAGE_CREDITS = "archon.credits.v1";
 const MAX_PROMPT_LEN = 2000;
 const MIN_PROMPT_LEN = 2;
 
@@ -441,6 +445,65 @@ function Dashboard() {
     try { localStorage.setItem(STORAGE_ONBOARD, "1"); } catch { /* ignore */ }
   }, []);
 
+  // ---- Pi Payments: Pro Compute Credits ----
+  const [credits, setCredits] = useState<number>(0);
+  const [buying, setBuying] = useState<PiProductSku | null>(null);
+  const [payStatus, setPayStatus] = useState<{ kind: "idle" | "ok" | "error" | "cancelled"; message?: string }>({ kind: "idle" });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_CREDITS);
+      if (raw) {
+        const n = Number(JSON.parse(raw));
+        if (Number.isFinite(n) && n >= 0) setCredits(n);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_CREDITS, JSON.stringify(credits)); } catch { /* ignore */ }
+  }, [credits]);
+
+  const buyCredits = useCallback(async (sku: PiProductSku) => {
+    if (pi.status !== "authenticated") {
+      setPayStatus({ kind: "error", message: "Sign in with Pi before purchasing credits." });
+      return;
+    }
+    const product = PI_PRODUCTS[sku];
+    setBuying(sku);
+    setPayStatus({ kind: "idle" });
+    try {
+      // Pi.init is awaited inside createPiPayment.
+      await createPiPayment(
+        {
+          amount: product.amount,
+          memo: product.memo,
+          metadata: { sku, credits: product.credits, app: "archon-ai-core" },
+        },
+        {
+          onCompleted: (_paymentId) => {
+            setCredits((c) => c + product.credits);
+            setPayStatus({ kind: "ok", message: `+${product.credits.toLocaleString()} Pro Compute Credits added.` });
+            setBuying(null);
+          },
+          onCancel: () => {
+            setPayStatus({ kind: "cancelled", message: "Payment cancelled." });
+            setBuying(null);
+          },
+          onError: (err) => {
+            setPayStatus({ kind: "error", message: err.message || "Payment failed." });
+            setBuying(null);
+          },
+        },
+      );
+    } catch (err) {
+      setPayStatus({ kind: "error", message: err instanceof Error ? err.message : "Payment failed." });
+      setBuying(null);
+    }
+  }, [pi.status]);
+
+
+
   // ---- Render ----
   return (
     <div className="min-h-screen text-foreground">
@@ -583,6 +646,14 @@ function Dashboard() {
             </div>
           </div>
         </section>
+
+        <CreditsStore
+          credits={credits}
+          buying={buying}
+          payStatus={payStatus}
+          piAuthed={pi.status === "authenticated"}
+          onBuy={buyCredits}
+        />
 
         {/* Hardware Chart + Chat */}
         <section aria-label="Hardware transparency and local chat" className="grid grid-cols-1 lg:grid-cols-5 gap-5">
@@ -1193,7 +1264,121 @@ function Bubble({ m, onResend }: { m: ChatMessage; onResend: (id: string) => voi
   );
 }
 
+// ============ Credits Store ============
+function CreditsStore({
+  credits,
+  buying,
+  payStatus,
+  piAuthed,
+  onBuy,
+}: {
+  credits: number;
+  buying: PiProductSku | null;
+  payStatus: { kind: "idle" | "ok" | "error" | "cancelled"; message?: string };
+  piAuthed: boolean;
+  onBuy: (sku: PiProductSku) => void;
+}) {
+  const skus = Object.keys(PI_PRODUCTS) as PiProductSku[];
+  return (
+    <section aria-labelledby="credits-title" className="glass-card rounded-2xl p-6 relative overflow-hidden">
+      <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-accent/20 blur-3xl pointer-events-none" aria-hidden="true" />
+      <div className="relative flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <ShoppingBag className="w-3.5 h-3.5 text-primary" aria-hidden="true" /> Pro Compute Store
+          </div>
+          <h2 id="credits-title" className="mt-3 font-display text-2xl font-semibold">
+            Buy <span className="text-gradient-violet">Pro Compute Credits</span> with π
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Credits unlock higher inference throughput and longer context on your local Llama-3-8B.
+          </p>
+        </div>
+        <div
+          className="flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full border border-primary/30 bg-primary/10"
+          role="status"
+          aria-live="polite"
+        >
+          <Coins className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+          <span className="text-xs text-muted-foreground">Balance</span>
+          <span className="font-display font-semibold tabular-nums">{credits.toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {skus.map((sku) => {
+          const p = PI_PRODUCTS[sku];
+          const isBuying = buying === sku;
+          const disabled = !!buying || !piAuthed;
+          return (
+            <div
+              key={sku}
+              className="rounded-xl border border-border/70 bg-card/60 p-4 flex flex-col gap-3 hover:border-primary/50 transition"
+            >
+              <div className="flex items-baseline justify-between">
+                <div className="font-display text-lg font-semibold">{p.credits.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground font-mono">credits</div>
+              </div>
+              <div className="text-xs text-muted-foreground">{p.name}</div>
+              <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/60">
+                <div className="font-display font-semibold">π {p.amount}</div>
+                <button
+                  type="button"
+                  onClick={() => onBuy(sku)}
+                  disabled={disabled}
+                  aria-label={`Buy ${p.name} for ${p.amount} Pi`}
+                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-xs font-medium glow-violet hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {isBuying ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                      Processing…
+                    </>
+                  ) : (
+                    <>
+                      <Coins className="w-3.5 h-3.5" aria-hidden="true" />
+                      Buy
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="relative mt-4 min-h-[20px] text-xs" aria-live="polite">
+        {!piAuthed && (
+          <p className="text-amber-400 inline-flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />
+            Sign in with Pi above to enable purchases.
+          </p>
+        )}
+        {payStatus.kind === "ok" && (
+          <p className="text-success inline-flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+            {payStatus.message}
+          </p>
+        )}
+        {payStatus.kind === "error" && (
+          <p className="text-destructive inline-flex items-center gap-1.5" role="alert">
+            <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />
+            {payStatus.message}
+          </p>
+        )}
+        {payStatus.kind === "cancelled" && (
+          <p className="text-muted-foreground inline-flex items-center gap-1.5">
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
+            {payStatus.message}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ============ Onboarding ============
+
 const ONBOARD_STEPS = [
   {
     title: "Welcome to Archon AI Core",
