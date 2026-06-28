@@ -469,7 +469,10 @@ function Dashboard() {
   const [credits, setCredits] = useState<number>(0);
   const [buying, setBuying] = useState<PiProductSku | null>(null);
   const [payStatus, setPayStatus] = useState<{ kind: "idle" | "ok" | "error" | "cancelled"; message?: string }>({ kind: "idle" });
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [creditsRefreshing, setCreditsRefreshing] = useState(false);
 
+  // Hydrate balance + purchases from localStorage (offline-first mirror).
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_CREDITS);
@@ -478,13 +481,68 @@ function Dashboard() {
         if (Number.isFinite(n) && n >= 0) setCredits(n);
       }
     } catch { /* ignore */ }
+    try {
+      const raw = localStorage.getItem(STORAGE_PURCHASES);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setPurchases(arr as Purchase[]);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_CREDITS, JSON.stringify(credits)); } catch { /* ignore */ }
   }, [credits]);
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_PURCHASES, JSON.stringify(purchases)); } catch { /* ignore */ }
+  }, [purchases]);
 
-  const buyCredits = useCallback(async (sku: PiProductSku) => {
+  // Authoritative balance fetch from the server. Merges server-side
+  // completed purchases into the local history without duplicating.
+  const refreshCredits = useCallback(async () => {
+    const token = piAccessTokenRef.current;
+    if (!token) return;
+    setCreditsRefreshing(true);
+    try {
+      const res = await getCreditsState({ data: { accessToken: token } });
+      if (res.ok) {
+        setCredits(res.balance);
+        setPurchases((prev) => {
+          const byPaymentId = new Map<string, Purchase>();
+          for (const p of prev) if (p.paymentId) byPaymentId.set(p.paymentId, p);
+          for (const s of res.purchases as PurchaseRecord[]) {
+            const existing = byPaymentId.get(s.paymentId);
+            byPaymentId.set(s.paymentId, {
+              id: existing?.id ?? s.paymentId,
+              paymentId: s.paymentId,
+              sku: s.sku,
+              packName: s.packName,
+              amount: s.amount,
+              credits: s.credits,
+              status: "completed",
+              ts: existing?.ts ?? s.ts,
+            });
+          }
+          const merged = [
+            ...prev.filter((p) => !p.paymentId || !byPaymentId.has(p.paymentId)),
+            ...byPaymentId.values(),
+          ];
+          merged.sort((a, b) => b.ts - a.ts);
+          return merged;
+        });
+      }
+    } catch { /* ignore */ } finally {
+      setCreditsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { refreshCreditsRef.current = refreshCredits; }, [refreshCredits]);
+
+  const updatePurchase = useCallback((id: string, patch: Partial<Purchase>) => {
+    setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }, []);
+
+  const buyCredits = useCallback(async (sku: PiProductSku, retryOfId?: string) => {
     if (pi.status !== "authenticated") {
       setPayStatus({ kind: "error", message: "Sign in with Pi before purchasing credits." });
       return;
@@ -492,8 +550,28 @@ function Dashboard() {
     const product = PI_PRODUCTS[sku];
     setBuying(sku);
     setPayStatus({ kind: "idle" });
+
+    // Reuse the existing row for a retry so the user sees lifecycle in place
+    // instead of an ever-growing list of duplicates.
+    const localId = retryOfId ?? uid();
+    if (retryOfId) {
+      updatePurchase(retryOfId, { status: "pending", error: undefined, ts: Date.now(), paymentId: undefined });
+    } else {
+      setPurchases((prev) => [
+        {
+          id: localId,
+          sku,
+          packName: product.name,
+          amount: product.amount,
+          credits: product.credits,
+          status: "pending",
+          ts: Date.now(),
+        },
+        ...prev,
+      ]);
+    }
+
     try {
-      // Pi.init is awaited inside createPiPayment.
       await createPiPayment(
         {
           amount: product.amount,
@@ -501,26 +579,45 @@ function Dashboard() {
           metadata: { sku, credits: product.credits, app: "archon-ai-core" },
         },
         {
-          onCompleted: (_paymentId) => {
-            setCredits((c) => c + product.credits);
+          onApproved: (paymentId) => {
+            updatePurchase(localId, { paymentId, status: "approved" });
+          },
+          onCompleted: (paymentId) => {
+            updatePurchase(localId, { paymentId, status: "completed" });
             setPayStatus({ kind: "ok", message: `+${product.credits.toLocaleString()} Pro Compute Credits added.` });
             setBuying(null);
+            // Server is authoritative; refetch dedups across retries.
+            void refreshCredits();
           },
           onCancel: () => {
+            updatePurchase(localId, { status: "cancelled" });
             setPayStatus({ kind: "cancelled", message: "Payment cancelled." });
             setBuying(null);
           },
           onError: (err) => {
+            updatePurchase(localId, { status: "failed", error: err.message });
             setPayStatus({ kind: "error", message: err.message || "Payment failed." });
             setBuying(null);
           },
         },
       );
     } catch (err) {
-      setPayStatus({ kind: "error", message: err instanceof Error ? err.message : "Payment failed." });
+      const message = err instanceof Error ? err.message : "Payment failed.";
+      updatePurchase(localId, { status: "failed", error: message });
+      setPayStatus({ kind: "error", message });
       setBuying(null);
     }
-  }, [pi.status]);
+  }, [pi.status, refreshCredits, updatePurchase]);
+
+  const retryPurchase = useCallback((p: Purchase) => {
+    void buyCredits(p.sku, p.id);
+  }, [buyCredits]);
+
+  const clearPurchase = useCallback((id: string) => {
+    setPurchases((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+
 
 
 
