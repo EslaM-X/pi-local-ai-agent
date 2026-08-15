@@ -1,5 +1,7 @@
 # Pi Local AI Agent (Project Bridge)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![CI](https://github.com/EslaM-X/pi-local-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/EslaM-X/pi-local-ai-agent/actions)
+
 ## Vision
 A privacy-first, decentralized interface that bridges the gap between massive open-source AI models and the everyday Pi Network user.
 
