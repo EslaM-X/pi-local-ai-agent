@@ -57,4 +57,12 @@ src/
 - [ ] Phase 2: Pi SDK Authentication Integration.
 - [ ] Phase 3: Decentralized Memory & Data Sync across Pi Nodes.
 - [ ] Phase 4: Community-driven Model Marketplace.
--
+
+## Contributing
+
+Contributions are welcome — local AI should be for everyone. Start with the
+[Contributing Guide](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+- **Good first issues** are labelled `good first issue` / `good first contribution`.
+- Every change keeps the project local-first and privacy-preserving.
+- See the [changelog](CHANGELOG.md) for release history.

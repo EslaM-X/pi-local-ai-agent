@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible bug in the Pi Local AI Agent
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A good bug report includes the exact way to
+        reproduce it — the dev server runs fully offline.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the unexpected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: |
+        The exact steps from `npm install` to the failure.
+      placeholder: |
+        npm install
+        npm run dev
+        # → open http://localhost:3000 ... then ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Dashboard UI
+        - Model orchestration
+        - Pi SDK integration
+        - Local data / memory
+        - Build / tooling
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node/bun version, OS, and whether install completed.
+    validations:
+      required: true

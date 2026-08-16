@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a new capability for the Pi Local AI Agent
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve? Who hits it?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: A concrete description of the new capability and its contract.
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: Design sketch
+      description: |
+        Interfaces, data flow, or a short example. Show where the feature
+        plugs in (dashboard, orchestration engine, Pi SDK, local memory).
+  - type: textarea
+    id: tests
+    attributes:
+      label: Testing plan
+      description: How will this be tested?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I read CONTRIBUTING.md and ROADMAP.md
+        - label: My proposal keeps the project local-first and privacy-preserving

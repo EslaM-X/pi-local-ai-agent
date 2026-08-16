@@ -1,0 +1,17 @@
+labels: [discussion]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Welcome to the pi-local-ai-agent discussions
+
+        Privacy-first local AI on the Pi Network — an install-and-run desktop
+        gateway that turns every Pi Node into a personal computing hub.
+
+        - **Q&A** — ask anything about installing, running, or extending the agent.
+        - **Ideas** — proposals for models, integrations, or UI.
+        - **Show and tell** — share setups and workflows you run locally.
+        - **Feedback** — what gets in the way of running AI locally?
+
+        Before posting, skim the [README](../../README.md) and
+        [ROADMAP](../../ROADMAP.md).

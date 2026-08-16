@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+- name: Discussions
+  url: https://github.com/EslaM-X/pi-local-ai-agent/discussions
+  about: Ask questions and discuss the roadmap here.
+- name: Project documentation
+  url: https://github.com/EslaM-X/pi-local-ai-agent/blob/main/docs
+  about: Architecture and design docs.
