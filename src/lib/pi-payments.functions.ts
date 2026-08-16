@@ -90,42 +90,68 @@ async function resolveUidFromAccessToken(accessToken: string): Promise<string | 
 
 // Strict validation of an on-chain Pi payment vs our catalog + the client's
 // declared expectation. Centralized so approve/complete share the same checks.
-function validateAgainstCatalog(payment: {
-  amount: number;
-  memo: string;
-  metadata: Record<string, unknown>;
-}, expected?: { amount: number; memo: string; metadata: Record<string, unknown> }):
-  | { ok: true; product: typeof PI_PRODUCTS[PiProductSku] }
-  | { ok: false; code: string; error: string }
-{
+function validateAgainstCatalog(
+  payment: {
+    amount: number;
+    memo: string;
+    metadata: Record<string, unknown>;
+  },
+  expected?: { amount: number; memo: string; metadata: Record<string, unknown> },
+):
+  | { ok: true; product: (typeof PI_PRODUCTS)[PiProductSku] }
+  | { ok: false; code: string; error: string } {
   const meta = payment.metadata ?? {};
   const sku = typeof meta.sku === "string" ? meta.sku : "";
-  const product = (PI_PRODUCTS as Record<string, typeof PI_PRODUCTS[PiProductSku]>)[sku];
+  const product = (PI_PRODUCTS as Record<string, (typeof PI_PRODUCTS)[PiProductSku]>)[sku];
   if (!product) return { ok: false, code: "unknown_sku", error: "Unknown product SKU" };
 
   if (Number(payment.amount) !== Number(product.amount)) {
-    return { ok: false, code: "amount_mismatch", error: "Payment amount does not match the product price" };
+    return {
+      ok: false,
+      code: "amount_mismatch",
+      error: "Payment amount does not match the product price",
+    };
   }
   if (payment.memo !== product.memo) {
     return { ok: false, code: "memo_mismatch", error: "Payment memo does not match the product" };
   }
   if (Number(meta.credits) !== Number(product.credits)) {
-    return { ok: false, code: "metadata_credits_mismatch", error: "Metadata credits do not match the SKU" };
+    return {
+      ok: false,
+      code: "metadata_credits_mismatch",
+      error: "Metadata credits do not match the SKU",
+    };
   }
   if (meta.app !== APP_TAG) {
-    return { ok: false, code: "metadata_app_mismatch", error: "Payment metadata is for a different application" };
+    return {
+      ok: false,
+      code: "metadata_app_mismatch",
+      error: "Payment metadata is for a different application",
+    };
   }
 
   if (expected) {
     if (Number(expected.amount) !== Number(product.amount)) {
-      return { ok: false, code: "expected_amount_mismatch", error: "Expected amount does not match the product" };
+      return {
+        ok: false,
+        code: "expected_amount_mismatch",
+        error: "Expected amount does not match the product",
+      };
     }
     if (expected.memo !== product.memo) {
-      return { ok: false, code: "expected_memo_mismatch", error: "Expected memo does not match the product" };
+      return {
+        ok: false,
+        code: "expected_memo_mismatch",
+        error: "Expected memo does not match the product",
+      };
     }
     const em = expected.metadata ?? {};
     if (em.sku !== sku || Number(em.credits) !== Number(product.credits) || em.app !== APP_TAG) {
-      return { ok: false, code: "expected_metadata_mismatch", error: "Expected metadata does not match the SKU" };
+      return {
+        ok: false,
+        code: "expected_metadata_mismatch",
+        error: "Expected metadata does not match the SKU",
+      };
     }
   }
 
@@ -163,7 +189,8 @@ export const approvePiPayment = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ ok: true } | { ok: false; code: string; error: string }> => {
     try {
       const lookup = await piFetch(`/v2/payments/${encodeURIComponent(data.paymentId)}`);
-      if (!lookup.ok) return { ok: false, code: "lookup_failed", error: `Pi lookup returned ${lookup.status}` };
+      if (!lookup.ok)
+        return { ok: false, code: "lookup_failed", error: `Pi lookup returned ${lookup.status}` };
       const payment = (await lookup.json()) as {
         amount: number;
         memo: string;
@@ -177,12 +204,20 @@ export const approvePiPayment = createServerFn({ method: "POST" })
         method: "POST",
       });
       if (!approve.ok) {
-        return { ok: false, code: "approve_failed", error: `Pi approve returned ${approve.status}` };
+        return {
+          ok: false,
+          code: "approve_failed",
+          error: `Pi approve returned ${approve.status}`,
+        };
       }
       approvedPaymentIds.add(data.paymentId);
       return { ok: true };
     } catch (err) {
-      return { ok: false, code: "exception", error: err instanceof Error ? err.message : "approval failed" };
+      return {
+        ok: false,
+        code: "exception",
+        error: err instanceof Error ? err.message : "approval failed",
+      };
     }
   });
 
@@ -205,66 +240,80 @@ export const completePiPayment = createServerFn({ method: "POST" })
     }
     return { paymentId: d.paymentId, txid: d.txid };
   })
-  .handler(async ({ data }): Promise<
-    | { ok: true; credits?: number; alreadyGranted?: boolean; balance?: number }
-    | { ok: false; code: string; error: string }
-  > => {
-    try {
-      // Re-validate the on-chain payment before crediting anything.
-      const lookup = await piFetch(`/v2/payments/${encodeURIComponent(data.paymentId)}`);
-      if (!lookup.ok) return { ok: false, code: "lookup_failed", error: `Pi lookup returned ${lookup.status}` };
-      const payment = (await lookup.json()) as {
-        amount: number;
-        memo: string;
-        metadata: Record<string, unknown>;
-        user_uid?: string;
-      };
-      const v = validateAgainstCatalog(payment);
-      if (!v.ok) return v;
+  .handler(
+    async ({
+      data,
+    }): Promise<
+      | { ok: true; credits?: number; alreadyGranted?: boolean; balance?: number }
+      | { ok: false; code: string; error: string }
+    > => {
+      try {
+        // Re-validate the on-chain payment before crediting anything.
+        const lookup = await piFetch(`/v2/payments/${encodeURIComponent(data.paymentId)}`);
+        if (!lookup.ok)
+          return { ok: false, code: "lookup_failed", error: `Pi lookup returned ${lookup.status}` };
+        const payment = (await lookup.json()) as {
+          amount: number;
+          memo: string;
+          metadata: Record<string, unknown>;
+          user_uid?: string;
+        };
+        const v = validateAgainstCatalog(payment);
+        if (!v.ok) return v;
 
-      // Idempotent: if we already credited this paymentId, return the balance.
-      if (completedPaymentIds.has(data.paymentId)) {
+        // Idempotent: if we already credited this paymentId, return the balance.
+        if (completedPaymentIds.has(data.paymentId)) {
+          const uid = payment.user_uid ?? "";
+          return {
+            ok: true,
+            alreadyGranted: true,
+            credits: v.product.credits,
+            balance: uid ? (balances.get(uid) ?? 0) : undefined,
+          };
+        }
+
+        const res = await piFetch(`/v2/payments/${encodeURIComponent(data.paymentId)}/complete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ txid: data.txid }),
+        });
+        if (!res.ok)
+          return {
+            ok: false,
+            code: "complete_failed",
+            error: `Pi complete returned ${res.status}`,
+          };
+
+        completedPaymentIds.add(data.paymentId);
+
         const uid = payment.user_uid ?? "";
+        let nextBalance: number | undefined;
+        if (uid) {
+          nextBalance = (balances.get(uid) ?? 0) + v.product.credits;
+          balances.set(uid, nextBalance);
+          const list = ledgers.get(uid) ?? [];
+          list.push({
+            paymentId: data.paymentId,
+            sku: v.product.sku as PiProductSku,
+            packName: v.product.name,
+            amount: v.product.amount,
+            credits: v.product.credits,
+            status: "completed",
+            txid: data.txid,
+            ts: Date.now(),
+          });
+          ledgers.set(uid, list);
+        }
+        return { ok: true, credits: v.product.credits, balance: nextBalance };
+      } catch (err) {
         return {
-          ok: true,
-          alreadyGranted: true,
-          credits: v.product.credits,
-          balance: uid ? balances.get(uid) ?? 0 : undefined,
+          ok: false,
+          code: "exception",
+          error: err instanceof Error ? err.message : "completion failed",
         };
       }
-
-      const res = await piFetch(`/v2/payments/${encodeURIComponent(data.paymentId)}/complete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ txid: data.txid }),
-      });
-      if (!res.ok) return { ok: false, code: "complete_failed", error: `Pi complete returned ${res.status}` };
-
-      completedPaymentIds.add(data.paymentId);
-
-      const uid = payment.user_uid ?? "";
-      let nextBalance: number | undefined;
-      if (uid) {
-        nextBalance = (balances.get(uid) ?? 0) + v.product.credits;
-        balances.set(uid, nextBalance);
-        const list = ledgers.get(uid) ?? [];
-        list.push({
-          paymentId: data.paymentId,
-          sku: v.product.sku as PiProductSku,
-          packName: v.product.name,
-          amount: v.product.amount,
-          credits: v.product.credits,
-          status: "completed",
-          txid: data.txid,
-          ts: Date.now(),
-        });
-        ledgers.set(uid, list);
-      }
-      return { ok: true, credits: v.product.credits, balance: nextBalance };
-    } catch (err) {
-      return { ok: false, code: "exception", error: err instanceof Error ? err.message : "completion failed" };
-    }
-  });
+    },
+  );
 
 /**
  * Authoritative balance + server-side purchase ledger for the signed-in user.
@@ -279,15 +328,18 @@ export const getCreditsState = createServerFn({ method: "POST" })
     }
     return { accessToken: t };
   })
-  .handler(async ({ data }): Promise<
-    | { ok: true; balance: number; purchases: PurchaseRecord[] }
-    | { ok: false; error: string }
-  > => {
-    const uid = await resolveUidFromAccessToken(data.accessToken);
-    if (!uid) return { ok: false, error: "Unable to verify Pi access token" };
-    return {
-      ok: true,
-      balance: balances.get(uid) ?? 0,
-      purchases: ledgers.get(uid) ?? [],
-    };
-  });
+  .handler(
+    async ({
+      data,
+    }): Promise<
+      { ok: true; balance: number; purchases: PurchaseRecord[] } | { ok: false; error: string }
+    > => {
+      const uid = await resolveUidFromAccessToken(data.accessToken);
+      if (!uid) return { ok: false, error: "Unable to verify Pi access token" };
+      return {
+        ok: true,
+        balance: balances.get(uid) ?? 0,
+        purchases: ledgers.get(uid) ?? [],
+      };
+    },
+  );

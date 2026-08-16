@@ -39,14 +39,23 @@ import {
 } from "recharts";
 import { ensurePiInit, authenticatePi, createPiPayment } from "@/lib/pi-sdk";
 import { validatePiToken } from "@/lib/pi-auth.functions";
-import { PI_PRODUCTS, type PiProductSku, getCreditsState, type PurchaseRecord } from "@/lib/pi-payments.functions";
+import {
+  PI_PRODUCTS,
+  type PiProductSku,
+  getCreditsState,
+  type PurchaseRecord,
+} from "@/lib/pi-payments.functions";
 import archonLogo from "@/assets/archon-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Archon AI Core — Decentralized Local Intelligence for Pi Network" },
-      { name: "description", content: "Archon AI Core runs private, verifiable Llama-3-8B intelligence on your Pi Node. Zero egress, zero telemetry, fully Pi-powered." },
+      {
+        name: "description",
+        content:
+          "Archon AI Core runs private, verifiable Llama-3-8B intelligence on your Pi Node. Zero egress, zero telemetry, fully Pi-powered.",
+      },
     ],
   }),
   component: Dashboard,
@@ -105,8 +114,14 @@ const MIN_PROMPT_LEN = 2;
 const PROMPT_TEMPLATES = [
   { label: "Summarize node logs", text: "Summarize the latest Pi-Node logs and flag anomalies." },
   { label: "Stake strategy", text: "Suggest a π staking strategy based on current network epoch." },
-  { label: "Optimize GPU load", text: "How can I reduce GPU load while keeping inference latency under 100ms?" },
-  { label: "Explain attestation", text: "Explain the zero-egress attestation hash in simple terms." },
+  {
+    label: "Optimize GPU load",
+    text: "How can I reduce GPU load while keeping inference latency under 100ms?",
+  },
+  {
+    label: "Explain attestation",
+    text: "Explain the zero-egress attestation hash in simple terms.",
+  },
   { label: "Tokenomics check", text: "Walk me through Pi tokenomics for a non-technical friend." },
 ];
 
@@ -142,9 +157,11 @@ function shortAddr(a: string) {
 function validatePrompt(input: string): { ok: true; value: string } | { ok: false; error: string } {
   const trimmed = input.trim();
   if (trimmed.length < MIN_PROMPT_LEN) return { ok: false, error: "Prompt is too short." };
-  if (trimmed.length > MAX_PROMPT_LEN) return { ok: false, error: `Keep prompts under ${MAX_PROMPT_LEN} characters.` };
+  if (trimmed.length > MAX_PROMPT_LEN)
+    return { ok: false, error: `Keep prompts under ${MAX_PROMPT_LEN} characters.` };
   // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u0008\u000B-\u001F\u007F]/.test(trimmed)) return { ok: false, error: "Prompt contains unsupported characters." };
+  if (/[\u0000-\u0008\u000B-\u001F\u007F]/.test(trimmed))
+    return { ok: false, error: "Prompt contains unsupported characters." };
   return { ok: true, value: trimmed };
 }
 
@@ -189,10 +206,18 @@ function Dashboard() {
       const result = await authenticatePi();
       const verified = await validatePiToken({ data: { accessToken: result.accessToken } });
       if (!verified.ok) throw new Error(verified.error);
-      const session = { status: "authenticated" as const, username: verified.user.username, uid: verified.user.uid };
+      const session = {
+        status: "authenticated" as const,
+        username: verified.user.username,
+        uid: verified.user.uid,
+      };
       piAccessTokenRef.current = result.accessToken;
       setPi(session);
-      try { localStorage.setItem(STORAGE_PI_SESSION, JSON.stringify(session)); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(STORAGE_PI_SESSION, JSON.stringify(session));
+      } catch {
+        /* ignore */
+      }
       // Refresh authoritative credits balance from the server.
       void refreshCreditsRef.current();
     } catch (e) {
@@ -215,14 +240,20 @@ function Dashboard() {
           return;
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     void runPiAuth(true);
   }, [runPiAuth]);
 
   const signOutPi = useCallback(() => {
     piAccessTokenRef.current = null;
     setPi({ status: "idle" });
-    try { localStorage.removeItem(STORAGE_PI_SESSION); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(STORAGE_PI_SESSION);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   // ---- Wallet ----
@@ -236,7 +267,9 @@ function Dashboard() {
         const parsed = JSON.parse(raw) as WalletState;
         if (parsed?.status === "connected") setWallet(parsed);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -246,7 +279,9 @@ function Dashboard() {
       } else if (wallet.status === "disconnected") {
         localStorage.removeItem(STORAGE_WALLET);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [wallet]);
 
   const connectWallet = useCallback(async () => {
@@ -260,7 +295,10 @@ function Dashboard() {
         balance: Math.round(Math.random() * 9000 * 100) / 100,
       });
     } catch (e) {
-      setWallet({ status: "error", message: e instanceof Error ? e.message : "Connection failed." });
+      setWallet({
+        status: "error",
+        message: e instanceof Error ? e.message : "Connection failed.",
+      });
     }
   }, []);
 
@@ -274,7 +312,9 @@ function Dashboard() {
       await navigator.clipboard.writeText(wallet.address);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [wallet]);
 
   // ---- Chat ----
@@ -292,13 +332,17 @@ function Dashboard() {
         const parsed = JSON.parse(raw) as ChatMessage[];
         if (Array.isArray(parsed)) setMessages(parsed);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_CHAT, JSON.stringify(messages.slice(-200)));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -317,7 +361,11 @@ function Dashboard() {
         setMessages((m) =>
           m.map((msg) =>
             msg.id === userMessageId
-              ? { ...msg, status: "failed", error: "Local inference timed out. Tap resend to retry." }
+              ? {
+                  ...msg,
+                  status: "failed",
+                  error: "Local inference timed out. Tap resend to retry.",
+                }
               : msg,
           ),
         );
@@ -325,7 +373,9 @@ function Dashboard() {
         return;
       }
       setMessages((m) => {
-        const updated = m.map((msg) => (msg.id === userMessageId ? { ...msg, status: "ok" as const, error: undefined } : msg));
+        const updated = m.map((msg) =>
+          msg.id === userMessageId ? { ...msg, status: "ok" as const, error: undefined } : msg,
+        );
         const reply: ChatMessage = {
           id: uid(),
           role: "agent",
@@ -349,7 +399,13 @@ function Dashboard() {
       }
       setPromptError(null);
       const id = uid();
-      const userMsg: ChatMessage = { id, role: "user", content: result.value, ts: Date.now(), status: "pending" };
+      const userMsg: ChatMessage = {
+        id,
+        role: "user",
+        content: result.value,
+        ts: Date.now(),
+        status: "pending",
+      };
       setMessages((m) => [...m, userMsg]);
       setPrompt("");
       runInference(id, result.value);
@@ -361,7 +417,11 @@ function Dashboard() {
     (id: string) => {
       const msg = messages.find((m) => m.id === id);
       if (!msg || msg.role !== "user") return;
-      setMessages((m) => m.map((x) => (x.id === id ? { ...x, status: "pending", error: undefined, ts: Date.now() } : x)));
+      setMessages((m) =>
+        m.map((x) =>
+          x.id === id ? { ...x, status: "pending", error: undefined, ts: Date.now() } : x,
+        ),
+      );
       runInference(id, msg.content);
     },
     [messages, runInference],
@@ -369,25 +429,39 @@ function Dashboard() {
 
   const clearChat = useCallback(() => {
     setMessages([]);
-    try { localStorage.removeItem(STORAGE_CHAT); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(STORAGE_CHAT);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
-  const exportChat = useCallback((format: "json" | "txt") => {
-    if (messages.length === 0) return;
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    if (format === "json") {
-      downloadBlob(
-        `archon-chat-${stamp}.json`,
-        JSON.stringify({ exportedAt: new Date().toISOString(), app: "Archon AI Core", messages }, null, 2),
-        "application/json",
-      );
-    } else {
-      const text = messages
-        .map((m) => `[${new Date(m.ts).toISOString()}] ${m.role === "user" ? "You" : "Archon"}: ${m.content}`)
-        .join("\n\n");
-      downloadBlob(`archon-chat-${stamp}.txt`, text, "text/plain;charset=utf-8");
-    }
-  }, [messages]);
+  const exportChat = useCallback(
+    (format: "json" | "txt") => {
+      if (messages.length === 0) return;
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      if (format === "json") {
+        downloadBlob(
+          `archon-chat-${stamp}.json`,
+          JSON.stringify(
+            { exportedAt: new Date().toISOString(), app: "Archon AI Core", messages },
+            null,
+            2,
+          ),
+          "application/json",
+        );
+      } else {
+        const text = messages
+          .map(
+            (m) =>
+              `[${new Date(m.ts).toISOString()}] ${m.role === "user" ? "You" : "Archon"}: ${m.content}`,
+          )
+          .join("\n\n");
+        downloadBlob(`archon-chat-${stamp}.txt`, text, "text/plain;charset=utf-8");
+      }
+    },
+    [messages],
+  );
 
   // ---- Hardware metrics (simulated, live) ----
   const [range, setRange] = useState<RangeId>("1m");
@@ -433,10 +507,16 @@ function Dashboard() {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      setTokensPerSec((v) => Math.max(18, Math.min(72, +(v + (Math.random() - 0.5) * 4).toFixed(1))));
+      setTokensPerSec((v) =>
+        Math.max(18, Math.min(72, +(v + (Math.random() - 0.5) * 4).toFixed(1))),
+      );
       setInferences((v) => v + Math.floor(Math.random() * 3));
-      setContextTokens((v) => Math.max(1024, Math.min(128000, v + Math.floor((Math.random() - 0.4) * 400))));
-      setUptimePct((v) => +(Math.min(99.99, Math.max(99.5, v + (Math.random() - 0.5) * 0.02))).toFixed(2));
+      setContextTokens((v) =>
+        Math.max(1024, Math.min(128000, v + Math.floor((Math.random() - 0.4) * 400))),
+      );
+      setUptimePct(
+        (v) => +Math.min(99.99, Math.max(99.5, v + (Math.random() - 0.5) * 0.02)).toFixed(2),
+      );
     }, 1500);
     return () => window.clearInterval(id);
   }, []);
@@ -448,9 +528,21 @@ function Dashboard() {
   }, [latest, tokensPerSec]);
 
   const healthMeta = {
-    healthy: { label: "Local Compute Active", ring: "border-success/30 bg-success/10", dot: "bg-success" },
-    degraded: { label: "Throttling — High Load", ring: "border-amber-400/30 bg-amber-400/10", dot: "bg-amber-400" },
-    offline: { label: "Compute Offline", ring: "border-destructive/30 bg-destructive/10", dot: "bg-destructive" },
+    healthy: {
+      label: "Local Compute Active",
+      ring: "border-success/30 bg-success/10",
+      dot: "bg-success",
+    },
+    degraded: {
+      label: "Throttling — High Load",
+      ring: "border-amber-400/30 bg-amber-400/10",
+      dot: "bg-amber-400",
+    },
+    offline: {
+      label: "Compute Offline",
+      ring: "border-destructive/30 bg-destructive/10",
+      dot: "bg-destructive",
+    },
   }[health];
 
   // ---- Onboarding ----
@@ -458,17 +550,26 @@ function Dashboard() {
   useEffect(() => {
     try {
       if (!localStorage.getItem(STORAGE_ONBOARD)) setOnboardOpen(true);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
   const dismissOnboard = useCallback(() => {
     setOnboardOpen(false);
-    try { localStorage.setItem(STORAGE_ONBOARD, "1"); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(STORAGE_ONBOARD, "1");
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   // ---- Pi Payments: Pro Compute Credits ----
   const [credits, setCredits] = useState<number>(0);
   const [buying, setBuying] = useState<PiProductSku | null>(null);
-  const [payStatus, setPayStatus] = useState<{ kind: "idle" | "ok" | "error" | "cancelled"; message?: string }>({ kind: "idle" });
+  const [payStatus, setPayStatus] = useState<{
+    kind: "idle" | "ok" | "error" | "cancelled";
+    message?: string;
+  }>({ kind: "idle" });
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [creditsRefreshing, setCreditsRefreshing] = useState(false);
 
@@ -480,21 +581,33 @@ function Dashboard() {
         const n = Number(JSON.parse(raw));
         if (Number.isFinite(n) && n >= 0) setCredits(n);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     try {
       const raw = localStorage.getItem(STORAGE_PURCHASES);
       if (raw) {
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) setPurchases(arr as Purchase[]);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_CREDITS, JSON.stringify(credits)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(STORAGE_CREDITS, JSON.stringify(credits));
+    } catch {
+      /* ignore */
+    }
   }, [credits]);
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_PURCHASES, JSON.stringify(purchases)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(STORAGE_PURCHASES, JSON.stringify(purchases));
+    } catch {
+      /* ignore */
+    }
   }, [purchases]);
 
   // Authoritative balance fetch from the server. Merges server-side
@@ -531,95 +644,109 @@ function Dashboard() {
           return merged;
         });
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setCreditsRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { refreshCreditsRef.current = refreshCredits; }, [refreshCredits]);
+  useEffect(() => {
+    refreshCreditsRef.current = refreshCredits;
+  }, [refreshCredits]);
 
   const updatePurchase = useCallback((id: string, patch: Partial<Purchase>) => {
     setPurchases((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }, []);
 
-  const buyCredits = useCallback(async (sku: PiProductSku, retryOfId?: string) => {
-    if (pi.status !== "authenticated") {
-      setPayStatus({ kind: "error", message: "Sign in with Pi before purchasing credits." });
-      return;
-    }
-    const product = PI_PRODUCTS[sku];
-    setBuying(sku);
-    setPayStatus({ kind: "idle" });
+  const buyCredits = useCallback(
+    async (sku: PiProductSku, retryOfId?: string) => {
+      if (pi.status !== "authenticated") {
+        setPayStatus({ kind: "error", message: "Sign in with Pi before purchasing credits." });
+        return;
+      }
+      const product = PI_PRODUCTS[sku];
+      setBuying(sku);
+      setPayStatus({ kind: "idle" });
 
-    // Reuse the existing row for a retry so the user sees lifecycle in place
-    // instead of an ever-growing list of duplicates.
-    const localId = retryOfId ?? uid();
-    if (retryOfId) {
-      updatePurchase(retryOfId, { status: "pending", error: undefined, ts: Date.now(), paymentId: undefined });
-    } else {
-      setPurchases((prev) => [
-        {
-          id: localId,
-          sku,
-          packName: product.name,
-          amount: product.amount,
-          credits: product.credits,
+      // Reuse the existing row for a retry so the user sees lifecycle in place
+      // instead of an ever-growing list of duplicates.
+      const localId = retryOfId ?? uid();
+      if (retryOfId) {
+        updatePurchase(retryOfId, {
           status: "pending",
+          error: undefined,
           ts: Date.now(),
-        },
-        ...prev,
-      ]);
-    }
+          paymentId: undefined,
+        });
+      } else {
+        setPurchases((prev) => [
+          {
+            id: localId,
+            sku,
+            packName: product.name,
+            amount: product.amount,
+            credits: product.credits,
+            status: "pending",
+            ts: Date.now(),
+          },
+          ...prev,
+        ]);
+      }
 
-    try {
-      await createPiPayment(
-        {
-          amount: product.amount,
-          memo: product.memo,
-          metadata: { sku, credits: product.credits, app: "archon-ai-core" },
-        },
-        {
-          onApproved: (paymentId) => {
-            updatePurchase(localId, { paymentId, status: "approved" });
+      try {
+        await createPiPayment(
+          {
+            amount: product.amount,
+            memo: product.memo,
+            metadata: { sku, credits: product.credits, app: "archon-ai-core" },
           },
-          onCompleted: (paymentId) => {
-            updatePurchase(localId, { paymentId, status: "completed" });
-            setPayStatus({ kind: "ok", message: `+${product.credits.toLocaleString()} Pro Compute Credits added.` });
-            setBuying(null);
-            // Server is authoritative; refetch dedups across retries.
-            void refreshCredits();
+          {
+            onApproved: (paymentId) => {
+              updatePurchase(localId, { paymentId, status: "approved" });
+            },
+            onCompleted: (paymentId) => {
+              updatePurchase(localId, { paymentId, status: "completed" });
+              setPayStatus({
+                kind: "ok",
+                message: `+${product.credits.toLocaleString()} Pro Compute Credits added.`,
+              });
+              setBuying(null);
+              // Server is authoritative; refetch dedups across retries.
+              void refreshCredits();
+            },
+            onCancel: () => {
+              updatePurchase(localId, { status: "cancelled" });
+              setPayStatus({ kind: "cancelled", message: "Payment cancelled." });
+              setBuying(null);
+            },
+            onError: (err) => {
+              updatePurchase(localId, { status: "failed", error: err.message });
+              setPayStatus({ kind: "error", message: err.message || "Payment failed." });
+              setBuying(null);
+            },
           },
-          onCancel: () => {
-            updatePurchase(localId, { status: "cancelled" });
-            setPayStatus({ kind: "cancelled", message: "Payment cancelled." });
-            setBuying(null);
-          },
-          onError: (err) => {
-            updatePurchase(localId, { status: "failed", error: err.message });
-            setPayStatus({ kind: "error", message: err.message || "Payment failed." });
-            setBuying(null);
-          },
-        },
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Payment failed.";
-      updatePurchase(localId, { status: "failed", error: message });
-      setPayStatus({ kind: "error", message });
-      setBuying(null);
-    }
-  }, [pi.status, refreshCredits, updatePurchase]);
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Payment failed.";
+        updatePurchase(localId, { status: "failed", error: message });
+        setPayStatus({ kind: "error", message });
+        setBuying(null);
+      }
+    },
+    [pi.status, refreshCredits, updatePurchase],
+  );
 
-  const retryPurchase = useCallback((p: Purchase) => {
-    void buyCredits(p.sku, p.id);
-  }, [buyCredits]);
+  const retryPurchase = useCallback(
+    (p: Purchase) => {
+      void buyCredits(p.sku, p.id);
+    },
+    [buyCredits],
+  );
 
   const clearPurchase = useCallback((id: string) => {
     setPurchases((prev) => prev.filter((p) => p.id !== id));
   }, []);
-
-
-
-
 
   // ---- Render ----
   return (
@@ -643,10 +770,17 @@ function Dashboard() {
         onOpenOnboard={() => setOnboardOpen(true)}
       />
 
-      <main id="main" className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8">
+      <main
+        id="main"
+        className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8"
+      >
         {/* Privacy Badge + Title */}
         <section aria-labelledby="hero-title" className="flex flex-col gap-5">
-          <div className="inline-flex w-fit items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full glass-card" role="status" aria-live="polite">
+          <div
+            className="inline-flex w-fit items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full glass-card"
+            role="status"
+            aria-live="polite"
+          >
             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-success/15">
               <Shield className="w-3.5 h-3.5 text-success" aria-hidden="true" />
             </span>
@@ -655,28 +789,38 @@ function Dashboard() {
             </span>
             <span className="w-1 h-1 rounded-full bg-border" aria-hidden="true" />
             <span className="text-xs font-mono text-muted-foreground">
-              {wallet.status === "connected" ? `node.${shortAddr(wallet.address)}` : "node.0xA1f8…3b2c"}
+              {wallet.status === "connected"
+                ? `node.${shortAddr(wallet.address)}`
+                : "node.0xA1f8…3b2c"}
             </span>
           </div>
 
           <div className="flex items-end justify-between gap-6 flex-wrap">
             <div>
-              <h1 id="hero-title" className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight">
-                Local intelligence,{" "}
-                <span className="text-gradient-violet">verifiably yours.</span>
+              <h1
+                id="hero-title"
+                className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight"
+              >
+                Local intelligence, <span className="text-gradient-violet">verifiably yours.</span>
               </h1>
               <p className="mt-3 text-muted-foreground max-w-xl">
-                Your AI agent runs entirely on your Pi Node. No prompts, no embeddings,
-                and no telemetry ever leave your hardware.
+                Your AI agent runs entirely on your Pi Node. No prompts, no embeddings, and no
+                telemetry ever leave your hardware.
               </p>
               {pi.status === "authenticated" && (
-                <p className="mt-2 text-sm text-success inline-flex items-center gap-1.5" role="status">
+                <p
+                  className="mt-2 text-sm text-success inline-flex items-center gap-1.5"
+                  role="status"
+                >
                   <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
                   Signed in via Pi Network as <span className="font-mono">@{pi.username}</span>
                 </p>
               )}
               {pi.status === "error" && (
-                <p className="mt-2 text-sm text-amber-400 inline-flex items-center gap-1.5" role="alert">
+                <p
+                  className="mt-2 text-sm text-amber-400 inline-flex items-center gap-1.5"
+                  role="alert"
+                >
                   <AlertCircle className="w-4 h-4" aria-hidden="true" />
                   Pi sign-in unavailable: {pi.message}
                 </p>
@@ -690,9 +834,15 @@ function Dashboard() {
         </section>
 
         {/* Top Row: Engine Status + Trust Layer */}
-        <section aria-label="AI engine and trust layer" className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <section
+          aria-label="AI engine and trust layer"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-5"
+        >
           <div className="lg:col-span-2 glass-card rounded-2xl p-6 relative overflow-hidden">
-            <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/20 blur-3xl pointer-events-none" aria-hidden="true" />
+            <div
+              className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-primary/20 blur-3xl pointer-events-none"
+              aria-hidden="true"
+            />
             <div className="relative flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -717,7 +867,9 @@ function Dashboard() {
                   <span className={`absolute inset-0 rounded-full ${healthMeta.dot} pulse-dot`} />
                   <span className={`relative rounded-full w-2 h-2 ${healthMeta.dot}`} />
                 </span>
-                <span className={`text-xs font-medium ${health === "healthy" ? "text-success" : health === "degraded" ? "text-amber-400" : "text-destructive"}`}>
+                <span
+                  className={`text-xs font-medium ${health === "healthy" ? "text-success" : health === "degraded" ? "text-amber-400" : "text-destructive"}`}
+                >
                   {healthMeta.label}
                 </span>
               </div>
@@ -725,14 +877,26 @@ function Dashboard() {
 
             <div className="relative mt-8 grid grid-cols-2 md:grid-cols-4 gap-px bg-border/40 rounded-xl overflow-hidden">
               {[
-                { label: "Tokens / sec", value: tokensPerSec.toFixed(1), sub: thinking ? "inference active" : "idle" },
-                { label: "Active context", value: contextTokens.toLocaleString(), sub: "tokens loaded" },
+                {
+                  label: "Tokens / sec",
+                  value: tokensPerSec.toFixed(1),
+                  sub: thinking ? "inference active" : "idle",
+                },
+                {
+                  label: "Active context",
+                  value: contextTokens.toLocaleString(),
+                  sub: "tokens loaded",
+                },
                 { label: "Uptime", value: `${uptimePct.toFixed(2)}%`, sub: "last 30 days" },
                 { label: "Inferences", value: inferences.toLocaleString(), sub: "today" },
               ].map((s) => (
                 <div key={s.label} className="bg-card/80 px-4 py-4">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</div>
-                  <div className="mt-1 font-display text-xl font-semibold tabular-nums">{s.value}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {s.label}
+                  </div>
+                  <div className="mt-1 font-display text-xl font-semibold tabular-nums">
+                    {s.value}
+                  </div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">{s.sub}</div>
                 </div>
               ))}
@@ -774,15 +938,13 @@ function Dashboard() {
           refreshing={creditsRefreshing}
         />
 
-        <PurchaseHistory
-          purchases={purchases}
-          onRetry={retryPurchase}
-          onClear={clearPurchase}
-        />
-
+        <PurchaseHistory purchases={purchases} onRetry={retryPurchase} onClear={clearPurchase} />
 
         {/* Hardware Chart + Chat */}
-        <section aria-label="Hardware transparency and local chat" className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        <section
+          aria-label="Hardware transparency and local chat"
+          className="grid grid-cols-1 lg:grid-cols-5 gap-5"
+        >
           <HardwareCard
             data={hw}
             range={range}
@@ -818,8 +980,15 @@ function Dashboard() {
         <footer className="pt-6 pb-2 flex items-center justify-between text-xs text-muted-foreground border-t border-border/40">
           <div className="font-mono">Archon AI Core · v0.5.0-beta</div>
           <div className="flex items-center gap-2">
-            <span className={`w-1.5 h-1.5 rounded-full ${healthMeta.dot} pulse-dot`} aria-hidden="true" />
-            {health === "healthy" ? "All systems nominal" : health === "degraded" ? "Elevated load detected" : "Compute offline"}
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${healthMeta.dot} pulse-dot`}
+              aria-hidden="true"
+            />
+            {health === "healthy"
+              ? "All systems nominal"
+              : health === "degraded"
+                ? "Elevated load detected"
+                : "Compute offline"}
           </div>
         </footer>
       </main>
@@ -860,7 +1029,11 @@ function Header({
     <header className="sticky top-0 z-50 border-b border-border/50 backdrop-blur-xl bg-background/40">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         <div className="flex items-center gap-6 sm:gap-10 min-w-0">
-          <a href="/" className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg" aria-label="Archon AI Core — home">
+          <a
+            href="/"
+            className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+            aria-label="Archon AI Core — home"
+          >
             <div className="relative">
               <div className="absolute inset-0 blur-md bg-primary/60" aria-hidden="true" />
               <img
@@ -875,11 +1048,22 @@ function Header({
               Archon <span className="text-gradient-violet">AI Core</span>
             </div>
           </a>
-          <nav aria-label="Primary" className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
-            <a className="text-foreground" href="#main" aria-current="page">Dashboard</a>
-            <a className="hover:text-foreground transition" href="#">Models</a>
-            <a className="hover:text-foreground transition" href="#">Network</a>
-            <a className="hover:text-foreground transition" href="#">Logs</a>
+          <nav
+            aria-label="Primary"
+            className="hidden md:flex items-center gap-7 text-sm text-muted-foreground"
+          >
+            <a className="text-foreground" href="#main" aria-current="page">
+              Dashboard
+            </a>
+            <a className="hover:text-foreground transition" href="#">
+              Models
+            </a>
+            <a className="hover:text-foreground transition" href="#">
+              Network
+            </a>
+            <a className="hover:text-foreground transition" href="#">
+              Logs
+            </a>
           </nav>
         </div>
 
@@ -897,7 +1081,10 @@ function Header({
           <PiAuthButton pi={pi} onSignIn={onPiSignIn} onSignOut={onPiSignOut} />
 
           {wallet.status === "error" && (
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-destructive" role="alert">
+            <div
+              className="hidden sm:flex items-center gap-1.5 text-xs text-destructive"
+              role="alert"
+            >
               <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />
               <span className="max-w-[160px] truncate">{wallet.message}</span>
             </div>
@@ -909,16 +1096,23 @@ function Header({
               onClick={onConnect}
               disabled={wallet.status === "connecting"}
               className="group relative inline-flex items-center gap-2 px-3 sm:px-4 h-10 rounded-lg bg-gradient-to-r from-primary to-accent text-primary-foreground text-sm font-medium glow-violet hover:brightness-110 transition disabled:opacity-70 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              aria-label={wallet.status === "connecting" ? "Connecting Pi Wallet" : "Connect Pi Wallet"}
+              aria-label={
+                wallet.status === "connecting" ? "Connecting Pi Wallet" : "Connect Pi Wallet"
+              }
             >
               {wallet.status === "connecting" ? (
                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               ) : (
                 <Wallet className="w-4 h-4" aria-hidden="true" />
               )}
-              <span className="hidden xs:inline sm:inline">{wallet.status === "connecting" ? "Connecting…" : "Connect Pi Wallet"}</span>
+              <span className="hidden xs:inline sm:inline">
+                {wallet.status === "connecting" ? "Connecting…" : "Connect Pi Wallet"}
+              </span>
               {wallet.status !== "connecting" && (
-                <ArrowUpRight className="w-3.5 h-3.5 opacity-70 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" aria-hidden="true" />
+                <ArrowUpRight
+                  className="w-3.5 h-3.5 opacity-70 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+                  aria-hidden="true"
+                />
               )}
             </button>
           ) : (
@@ -940,12 +1134,22 @@ function Header({
                 <span className="font-display font-semibold">π {wallet.balance.toFixed(2)}</span>
               </button>
               {open && (
-                <div role="menu" aria-label="Wallet actions" className="absolute right-0 mt-2 w-72 glass-card rounded-xl p-4 shadow-xl">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Pi Wallet</div>
-                  <div className="mt-1 font-mono text-xs text-foreground break-all">{wallet.address}</div>
+                <div
+                  role="menu"
+                  aria-label="Wallet actions"
+                  className="absolute right-0 mt-2 w-72 glass-card rounded-xl p-4 shadow-xl"
+                >
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Pi Wallet
+                  </div>
+                  <div className="mt-1 font-mono text-xs text-foreground break-all">
+                    {wallet.address}
+                  </div>
                   <div className="mt-3 flex items-center justify-between border-t border-border/60 pt-3">
                     <span className="text-xs text-muted-foreground">Balance</span>
-                    <span className="font-display font-semibold">π {wallet.balance.toFixed(2)}</span>
+                    <span className="font-display font-semibold">
+                      π {wallet.balance.toFixed(2)}
+                    </span>
                   </div>
                   <div className="mt-3 flex gap-2">
                     <button
@@ -954,7 +1158,11 @@ function Header({
                       className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg border border-border/70 hover:border-primary/50 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       aria-label="Copy wallet address"
                     >
-                      {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-success" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+                      {copied ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-success" aria-hidden="true" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                      )}
                       {copied ? "Copied" : "Copy address"}
                     </button>
                     <button
@@ -977,7 +1185,15 @@ function Header({
   );
 }
 
-function PiAuthButton({ pi, onSignIn, onSignOut }: { pi: PiSession; onSignIn: () => void; onSignOut: () => void }) {
+function PiAuthButton({
+  pi,
+  onSignIn,
+  onSignOut,
+}: {
+  pi: PiSession;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
   if (pi.status === "authenticated") {
     return (
       <button
@@ -987,8 +1203,7 @@ function PiAuthButton({ pi, onSignIn, onSignOut }: { pi: PiSession; onSignIn: ()
         aria-label={`Signed in as ${pi.username}. Click to sign out.`}
         title="Click to sign out of Pi Network"
       >
-        <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-        @{pi.username}
+        <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />@{pi.username}
       </button>
     );
   }
@@ -1001,7 +1216,11 @@ function PiAuthButton({ pi, onSignIn, onSignOut }: { pi: PiSession; onSignIn: ()
       className="hidden sm:inline-flex items-center gap-1.5 h-10 px-3 rounded-lg border border-primary/40 text-xs font-medium text-foreground hover:bg-primary/10 transition disabled:opacity-70 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       aria-label="Sign in with Pi Network"
     >
-      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <KeyRound className="w-3.5 h-3.5" aria-hidden="true" />}
+      {loading ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+      ) : (
+        <KeyRound className="w-3.5 h-3.5" aria-hidden="true" />
+      )}
       {loading ? "Signing in…" : "Sign in with Pi"}
     </button>
   );
@@ -1023,10 +1242,7 @@ function HardwareCard({
   avgCpu: number;
   avgGpu: number;
 }) {
-  const chartData = useMemo(
-    () => data.map((d) => ({ ...d, label: fmtTime(d.t) })),
-    [data],
-  );
+  const chartData = useMemo(() => data.map((d) => ({ ...d, label: fmtTime(d.t) })), [data]);
 
   return (
     <div className="lg:col-span-3 glass-card rounded-2xl p-6">
@@ -1048,7 +1264,11 @@ function HardwareCard({
               <span className="text-muted-foreground">GPU</span>
             </div>
           </div>
-          <div role="tablist" aria-label="Chart time range" className="flex items-center rounded-lg border border-border/70 p-0.5 text-xs">
+          <div
+            role="tablist"
+            aria-label="Chart time range"
+            className="flex items-center rounded-lg border border-border/70 p-0.5 text-xs"
+          >
             {TIME_RANGES.map((r) => (
               <button
                 key={r.id}
@@ -1069,9 +1289,17 @@ function HardwareCard({
         </div>
       </div>
 
-      <div className="h-64 -ml-3 mt-4" role="img" aria-label={`CPU and GPU allocation over time. Latest CPU ${latest.cpu}%, GPU ${latest.gpu}%.`}>
+      <div
+        className="h-64 -ml-3 mt-4"
+        role="img"
+        aria-label={`CPU and GPU allocation over time. Latest CPU ${latest.cpu}%, GPU ${latest.gpu}%.`}
+      >
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} stackOffset="none">
+          <AreaChart
+            data={chartData}
+            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+            stackOffset="none"
+          >
             <defs>
               <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="oklch(0.65 0.22 295)" stopOpacity={0.8} />
@@ -1083,11 +1311,42 @@ function HardwareCard({
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.05)" vertical={false} />
-            <XAxis dataKey="label" tick={{ fill: "oklch(0.68 0.03 280)", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={32} />
-            <YAxis tick={{ fill: "oklch(0.68 0.03 280)", fontSize: 11 }} axisLine={false} tickLine={false} unit="%" domain={[0, 200]} />
-            <Tooltip content={<HwTooltip />} cursor={{ stroke: "oklch(1 0 0 / 0.15)", strokeWidth: 1 }} />
-            <Area type="monotone" dataKey="cpu" stackId="load" stroke="oklch(0.65 0.22 295)" strokeWidth={2} fill="url(#cpuGrad)" isAnimationActive={false} />
-            <Area type="monotone" dataKey="gpu" stackId="load" stroke="oklch(0.82 0.16 200)" strokeWidth={2} fill="url(#gpuGrad)" isAnimationActive={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: "oklch(0.68 0.03 280)", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              minTickGap={32}
+            />
+            <YAxis
+              tick={{ fill: "oklch(0.68 0.03 280)", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              unit="%"
+              domain={[0, 200]}
+            />
+            <Tooltip
+              content={<HwTooltip />}
+              cursor={{ stroke: "oklch(1 0 0 / 0.15)", strokeWidth: 1 }}
+            />
+            <Area
+              type="monotone"
+              dataKey="cpu"
+              stackId="load"
+              stroke="oklch(0.65 0.22 295)"
+              strokeWidth={2}
+              fill="url(#cpuGrad)"
+              isAnimationActive={false}
+            />
+            <Area
+              type="monotone"
+              dataKey="gpu"
+              stackId="load"
+              stroke="oklch(0.82 0.16 200)"
+              strokeWidth={2}
+              fill="url(#gpuGrad)"
+              isAnimationActive={false}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -1112,7 +1371,15 @@ function HardwareCard({
   );
 }
 
-function HwTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+function HwTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   const cpu = payload.find((p) => p.name === "cpu")?.value ?? 0;
   const gpu = payload.find((p) => p.name === "gpu")?.value ?? 0;
@@ -1171,7 +1438,10 @@ function ChatCard({
 
   return (
     <div className="lg:col-span-2 glass-card rounded-2xl p-6 flex flex-col relative overflow-hidden">
-      <div className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full bg-accent/30 blur-3xl pointer-events-none" aria-hidden="true" />
+      <div
+        className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full bg-accent/30 blur-3xl pointer-events-none"
+        aria-hidden="true"
+      />
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
           <Zap className="w-3.5 h-3.5 text-primary" aria-hidden="true" /> Local Agent
@@ -1192,11 +1462,17 @@ function ChatCard({
                   export
                 </button>
                 {exportOpen && (
-                  <div role="menu" className="absolute right-0 mt-2 w-40 glass-card rounded-lg p-1 shadow-xl z-10">
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-40 glass-card rounded-lg p-1 shadow-xl z-10"
+                  >
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => { onExport("json"); setExportOpen(false); }}
+                      onClick={() => {
+                        onExport("json");
+                        setExportOpen(false);
+                      }}
                       className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-primary/10 transition focus-visible:outline-none focus-visible:bg-primary/10"
                     >
                       Download .json
@@ -1204,7 +1480,10 @@ function ChatCard({
                     <button
                       type="button"
                       role="menuitem"
-                      onClick={() => { onExport("txt"); setExportOpen(false); }}
+                      onClick={() => {
+                        onExport("txt");
+                        setExportOpen(false);
+                      }}
                       className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-primary/10 transition focus-visible:outline-none focus-visible:bg-primary/10"
                     >
                       Download .txt
@@ -1240,12 +1519,16 @@ function ChatCard({
       >
         {messages.length === 0 ? (
           <div className="flex gap-3">
-            <div className="w-7 h-7 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0" aria-hidden="true">
+            <div
+              className="w-7 h-7 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0"
+              aria-hidden="true"
+            >
               <CircuitBoard className="w-3.5 h-3.5 text-primary-foreground" />
             </div>
             <div className="text-sm leading-relaxed">
               <div className="text-xs text-muted-foreground mb-1">Archon Agent</div>
-              Node online. Running Llama-3-8B locally. Ask anything — your prompt won't leave this machine.
+              Node online. Running Llama-3-8B locally. Ask anything — your prompt won't leave this
+              machine.
             </div>
           </div>
         ) : (
@@ -1253,20 +1536,34 @@ function ChatCard({
         )}
         {thinking && (
           <div className="flex gap-3" aria-label="Assistant is thinking">
-            <div className="w-7 h-7 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0" aria-hidden="true">
+            <div
+              className="w-7 h-7 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0"
+              aria-hidden="true"
+            >
               <CircuitBoard className="w-3.5 h-3.5 text-primary-foreground" />
             </div>
-            <div className="text-sm text-muted-foreground inline-flex items-center gap-1" aria-hidden="true">
+            <div
+              className="text-sm text-muted-foreground inline-flex items-center gap-1"
+              aria-hidden="true"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-primary pulse-dot" />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary pulse-dot" style={{ animationDelay: "0.2s" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary pulse-dot" style={{ animationDelay: "0.4s" }} />
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-primary pulse-dot"
+                style={{ animationDelay: "0.2s" }}
+              />
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-primary pulse-dot"
+                style={{ animationDelay: "0.4s" }}
+              />
             </div>
           </div>
         )}
       </div>
 
       <div className="relative mt-4">
-        <label htmlFor="chat-input" className="sr-only">Message Archon AI</label>
+        <label htmlFor="chat-input" className="sr-only">
+          Message Archon AI
+        </label>
         <div
           className={`flex items-center gap-2 rounded-xl border bg-input/50 transition pl-4 pr-2 py-2 ${
             promptError || overLimit
@@ -1298,12 +1595,22 @@ function ChatCard({
             aria-label="Send message"
             className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground hover:brightness-110 transition disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
-            {thinking ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Send className="w-4 h-4" aria-hidden="true" />}
+            {thinking ? (
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Send className="w-4 h-4" aria-hidden="true" />
+            )}
           </button>
         </div>
 
-        <div id="chat-input-status" className="mt-1.5 flex items-center justify-between text-[11px]">
-          <div className="text-destructive flex items-center gap-1 min-h-[14px]" role={promptError ? "alert" : undefined}>
+        <div
+          id="chat-input-status"
+          className="mt-1.5 flex items-center justify-between text-[11px]"
+        >
+          <div
+            className="text-destructive flex items-center gap-1 min-h-[14px]"
+            role={promptError ? "alert" : undefined}
+          >
             {promptError && (
               <>
                 <AlertCircle className="w-3 h-3" aria-hidden="true" />
@@ -1316,7 +1623,11 @@ function ChatCard({
           </span>
         </div>
 
-        <div className="mt-2.5 flex items-start gap-2 text-[11px] text-muted-foreground flex-wrap" role="group" aria-label="Pi-powered prompt templates">
+        <div
+          className="mt-2.5 flex items-start gap-2 text-[11px] text-muted-foreground flex-wrap"
+          role="group"
+          aria-label="Pi-powered prompt templates"
+        >
           <Sparkles className="w-3 h-3 text-primary mt-1" aria-hidden="true" />
           <span className="mt-0.5">Templates:</span>
           {PROMPT_TEMPLATES.map((t) => (
@@ -1343,18 +1654,21 @@ function Bubble({ m, onResend }: { m: ChatMessage; onResend: (id: string) => voi
     return (
       <div className="flex justify-end">
         <div className="max-w-[85%]">
-          <div className="text-[10px] text-muted-foreground text-right mb-1 font-mono">{fmtTime(m.ts)}</div>
+          <div className="text-[10px] text-muted-foreground text-right mb-1 font-mono">
+            {fmtTime(m.ts)}
+          </div>
           <div
             className={`rounded-xl rounded-tr-sm border px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap break-words ${
-              failed
-                ? "bg-destructive/10 border-destructive/40"
-                : "bg-primary/20 border-primary/30"
+              failed ? "bg-destructive/10 border-destructive/40" : "bg-primary/20 border-primary/30"
             } ${pending ? "opacity-70" : ""}`}
           >
             {m.content}
           </div>
           {failed && (
-            <div className="mt-1.5 flex items-center justify-end gap-2 text-[11px] text-destructive" role="alert">
+            <div
+              className="mt-1.5 flex items-center justify-end gap-2 text-[11px] text-destructive"
+              role="alert"
+            >
               <AlertCircle className="w-3 h-3" aria-hidden="true" />
               <span>{m.error ?? "Message failed."}</span>
               <button
@@ -1379,11 +1693,16 @@ function Bubble({ m, onResend }: { m: ChatMessage; onResend: (id: string) => voi
   }
   return (
     <div className="flex gap-3">
-      <div className="w-7 h-7 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0" aria-hidden="true">
+      <div
+        className="w-7 h-7 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0"
+        aria-hidden="true"
+      >
         <CircuitBoard className="w-3.5 h-3.5 text-primary-foreground" />
       </div>
       <div className="max-w-[85%]">
-        <div className="text-[10px] text-muted-foreground mb-1 font-mono">Archon Agent · {fmtTime(m.ts)}</div>
+        <div className="text-[10px] text-muted-foreground mb-1 font-mono">
+          Archon Agent · {fmtTime(m.ts)}
+        </div>
         <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">{m.content}</div>
       </div>
     </div>
@@ -1401,11 +1720,31 @@ function PurchaseHistory({
   onClear: (id: string) => void;
 }) {
   const statusMeta: Record<PurchaseStatus, { label: string; cls: string; dot: string }> = {
-    pending: { label: "Pending", cls: "text-amber-400 border-amber-400/30 bg-amber-400/10", dot: "bg-amber-400 animate-pulse" },
-    approved: { label: "Approved", cls: "text-primary border-primary/30 bg-primary/10", dot: "bg-primary animate-pulse" },
-    completed: { label: "Granted", cls: "text-success border-success/30 bg-success/10", dot: "bg-success" },
-    failed: { label: "Failed", cls: "text-destructive border-destructive/30 bg-destructive/10", dot: "bg-destructive" },
-    cancelled: { label: "Cancelled", cls: "text-muted-foreground border-border bg-card/60", dot: "bg-muted-foreground" },
+    pending: {
+      label: "Pending",
+      cls: "text-amber-400 border-amber-400/30 bg-amber-400/10",
+      dot: "bg-amber-400 animate-pulse",
+    },
+    approved: {
+      label: "Approved",
+      cls: "text-primary border-primary/30 bg-primary/10",
+      dot: "bg-primary animate-pulse",
+    },
+    completed: {
+      label: "Granted",
+      cls: "text-success border-success/30 bg-success/10",
+      dot: "bg-success",
+    },
+    failed: {
+      label: "Failed",
+      cls: "text-destructive border-destructive/30 bg-destructive/10",
+      dot: "bg-destructive",
+    },
+    cancelled: {
+      label: "Cancelled",
+      cls: "text-muted-foreground border-border bg-card/60",
+      dot: "bg-muted-foreground",
+    },
   };
 
   return (
@@ -1444,10 +1783,15 @@ function PurchaseHistory({
             <tbody>
               {purchases.map((p) => {
                 const meta = statusMeta[p.status];
-                const idLabel = p.paymentId ? `${p.paymentId.slice(0, 8)}…${p.paymentId.slice(-4)}` : "—";
+                const idLabel = p.paymentId
+                  ? `${p.paymentId.slice(0, 8)}…${p.paymentId.slice(-4)}`
+                  : "—";
                 return (
                   <tr key={p.id} className="border-b border-border/40 last:border-b-0 align-top">
-                    <td className="py-3 pr-3 font-mono text-xs text-muted-foreground" title={p.paymentId ?? ""}>
+                    <td
+                      className="py-3 pr-3 font-mono text-xs text-muted-foreground"
+                      title={p.paymentId ?? ""}
+                    >
                       {idLabel}
                     </td>
                     <td className="py-3 pr-3">
@@ -1466,7 +1810,10 @@ function PurchaseHistory({
                       <span
                         className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] ${meta.cls}`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${meta.dot}`}
+                          aria-hidden="true"
+                        />
                         {meta.label}
                       </span>
                     </td>
@@ -1528,12 +1875,19 @@ function CreditsStore({
 }) {
   const skus = Object.keys(PI_PRODUCTS) as PiProductSku[];
   return (
-    <section aria-labelledby="credits-title" className="glass-card rounded-2xl p-6 relative overflow-hidden">
-      <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-accent/20 blur-3xl pointer-events-none" aria-hidden="true" />
+    <section
+      aria-labelledby="credits-title"
+      className="glass-card rounded-2xl p-6 relative overflow-hidden"
+    >
+      <div
+        className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-accent/20 blur-3xl pointer-events-none"
+        aria-hidden="true"
+      />
       <div className="relative flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            <ShoppingBag className="w-3.5 h-3.5 text-primary" aria-hidden="true" /> Pro Compute Store
+            <ShoppingBag className="w-3.5 h-3.5 text-primary" aria-hidden="true" /> Pro Compute
+            Store
           </div>
           <h2 id="credits-title" className="mt-3 font-display text-2xl font-semibold">
             Buy <span className="text-gradient-violet">Pro Compute Credits</span> with π
@@ -1550,7 +1904,9 @@ function CreditsStore({
           >
             <Coins className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
             <span className="text-xs text-muted-foreground">Balance</span>
-            <span className="font-display font-semibold tabular-nums">{credits.toLocaleString()}</span>
+            <span className="font-display font-semibold tabular-nums">
+              {credits.toLocaleString()}
+            </span>
           </div>
           <button
             type="button"
@@ -1559,11 +1915,13 @@ function CreditsStore({
             aria-label="Refresh credit balance"
             className="inline-flex items-center justify-center h-8 w-8 rounded-full border border-border/70 bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/40 transition disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} aria-hidden="true" />
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`}
+              aria-hidden="true"
+            />
           </button>
         </div>
       </div>
-
 
       <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
         {skus.map((sku) => {
@@ -1576,7 +1934,9 @@ function CreditsStore({
               className="rounded-xl border border-border/70 bg-card/60 p-4 flex flex-col gap-3 hover:border-primary/50 transition"
             >
               <div className="flex items-baseline justify-between">
-                <div className="font-display text-lg font-semibold">{p.credits.toLocaleString()}</div>
+                <div className="font-display text-lg font-semibold">
+                  {p.credits.toLocaleString()}
+                </div>
                 <div className="text-xs text-muted-foreground font-mono">credits</div>
               </div>
               <div className="text-xs text-muted-foreground">{p.name}</div>
@@ -1687,7 +2047,9 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="onboard-title"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         ref={dialogRef}
@@ -1703,14 +2065,19 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-violet" aria-hidden="true">
+          <div
+            className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center glow-violet"
+            aria-hidden="true"
+          >
             <Icon className="w-5 h-5 text-primary-foreground" />
           </div>
           <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
             Step {step + 1} of {ONBOARD_STEPS.length}
           </div>
         </div>
-        <h2 id="onboard-title" className="mt-4 font-display text-2xl font-semibold">{Item.title}</h2>
+        <h2 id="onboard-title" className="mt-4 font-display text-2xl font-semibold">
+          {Item.title}
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{Item.body}</p>
 
         <div className="mt-5 flex items-center gap-1.5" aria-hidden="true">

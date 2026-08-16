@@ -27,26 +27,31 @@ export const validatePiToken = createServerFn({ method: "POST" })
     }
     return { accessToken };
   })
-  .handler(async ({ data }): Promise<{ ok: true; user: PiSessionUser } | { ok: false; error: string }> => {
-    try {
-      const res = await fetch("https://api.minepi.com/v2/me", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${data.accessToken}`,
-          Accept: "application/json",
-        },
-      });
-      if (!res.ok) {
-        return { ok: false, error: `Pi /v2/me returned ${res.status}` };
+  .handler(
+    async ({ data }): Promise<{ ok: true; user: PiSessionUser } | { ok: false; error: string }> => {
+      try {
+        const res = await fetch("https://api.minepi.com/v2/me", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${data.accessToken}`,
+            Accept: "application/json",
+          },
+        });
+        if (!res.ok) {
+          return { ok: false, error: `Pi /v2/me returned ${res.status}` };
+        }
+        const body = (await res.json()) as { uid?: string; username?: string };
+        if (!body?.uid || !body?.username) {
+          return { ok: false, error: "Pi /v2/me returned an invalid payload" };
+        }
+        // Session is established here. For now we return the verified identity;
+        // persistent sessions can be layered on later (cookie/JWT) without changing the contract.
+        return { ok: true, user: { uid: body.uid, username: body.username } };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : "Network error validating Pi token",
+        };
       }
-      const body = (await res.json()) as { uid?: string; username?: string };
-      if (!body?.uid || !body?.username) {
-        return { ok: false, error: "Pi /v2/me returned an invalid payload" };
-      }
-      // Session is established here. For now we return the verified identity;
-      // persistent sessions can be layered on later (cookie/JWT) without changing the contract.
-      return { ok: true, user: { uid: body.uid, username: body.username } };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : "Network error validating Pi token" };
-    }
-  });
+    },
+  );

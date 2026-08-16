@@ -62,14 +62,17 @@ let scriptPromise: Promise<void> | null = null;
 const SDK_SRC = "https://sdk.minepi.com/pi-sdk.js";
 
 function loadScript(): Promise<void> {
-  if (typeof window === "undefined") return Promise.reject(new Error("Pi SDK requires a browser environment"));
+  if (typeof window === "undefined")
+    return Promise.reject(new Error("Pi SDK requires a browser environment"));
   if (window.Pi) return Promise.resolve();
   if (scriptPromise) return scriptPromise;
   scriptPromise = new Promise<void>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${SDK_SRC}"]`);
     if (existing) {
       existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Failed to load Pi SDK")), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Failed to load Pi SDK")), {
+        once: true,
+      });
       if (window.Pi) resolve();
       return;
     }
